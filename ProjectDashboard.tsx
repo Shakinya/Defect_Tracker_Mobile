@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableWithoutFeedback, FlatList } from 'react-native';
-import { ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, Modal, TouchableWithoutFeedback, FlatList, Image, ScrollView, TouchableOpacity, Animated } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Svg, Path, Circle, Text as SvgText } from 'react-native-svg';
+import { Svg, Path, Circle, Text as SvgText, Polygon } from 'react-native-svg';
 
 const styles = StyleSheet.create({
   container: {
@@ -69,7 +68,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   projectPillActive: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#365e7a',
   },
   projectPillText: {
     fontSize: 13,
@@ -161,7 +160,7 @@ const styles = StyleSheet.create({
   defectCardTitle: {
     fontSize: 15,
     fontWeight: 'bold',
-    marginBottom: 2,
+    marginBottom: 1,
   },
   defectCardTotal: {
     fontSize: 15,
@@ -178,7 +177,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   defectTypeCol: {
-    width: '48%',
+    width: '53%',
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 2,
@@ -208,17 +207,17 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   chartBtn: {
-    backgroundColor: '#e0e7ff',
+    backgroundColor: '#e1f0fa',
     borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     marginTop: 8,
     alignSelf: 'flex-start',
   },
   chartBtnText: {
-    color: '#2563eb',
+    color: '#2e6387',
     fontWeight: 'bold',
-    fontSize: 13,
+    fontSize: 12,
   },
 });
 
@@ -303,9 +302,124 @@ interface ProjectDashboardProps {
 }
 
 export default function ProjectDashboard({ route, navigation }: ProjectDashboardProps) {
+  const [isNight, setIsNight] = useState(false);
+  const bgAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(bgAnim, {
+      toValue: isNight ? 1 : 0,
+      duration: 500,
+      useNativeDriver: false,
+    }).start();
+  }, [isNight]);
+
+  const bgColor = bgAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#ebf3faff', '#101624'],
+  });
+  const headerColor = bgAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#1B3C53', '#181e2b'],
+  });
+  const cardColor = bgAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#fff', '#232a3a'],
+  });
   const { projectId: initialProjectId } = route.params;
   const [selectedProjectId, setSelectedProjectId] = useState<number>(initialProjectId);
   const project: ProjectDefectData = defectData[selectedProjectId] || defectData[1];
+
+  // Modal states for defect charts
+  const [highChartVisible, setHighChartVisible] = useState(false);
+  const [mediumChartVisible, setMediumChartVisible] = useState(false);
+  const [lowChartVisible, setLowChartVisible] = useState(false);
+
+  // Pie chart data for High defects (status breakdown)
+  const highStatusData = [
+    { label: 'REOPEN', value: project.defects.high.REOPEN || 0, color: '#ff2d2d' },
+    { label: 'NEW', value: project.defects.high.NEW || 0, color: '#3b3bfa' },
+    { label: 'OPEN', value: project.defects.high.OPEN || 0, color: '#facc15' },
+    { label: 'FIXED', value: project.defects.high.FIXED || 0, color: '#22c55e' },
+    { label: 'CLOSED', value: project.defects.high.CLOSED || 0, color: '#15803d' },
+    { label: 'REJECT', value: project.defects.high.REJECT || 0, color: '#7f1d1d' },
+    { label: 'DUPLICATE', value: project.defects.high.DUPLICATE || 0, color: '#64748b' },
+  ];
+  const highTotal = highStatusData.reduce((sum, d) => sum + d.value, 0);
+  let startAngle = 0;
+  const pieSegmentsHigh = highStatusData.map((d, idx) => {
+    if (d.value === 0) return null;
+    const angle = (d.value / (highTotal || 1)) * 2 * Math.PI;
+    const endAngle = startAngle + angle;
+    const r = 70, cx = 110, cy = 110;
+    const x1 = cx + r * Math.cos(startAngle - Math.PI / 2);
+    const y1 = cy + r * Math.sin(startAngle - Math.PI / 2);
+    const x2 = cx + r * Math.cos(endAngle - Math.PI / 2);
+    const y2 = cy + r * Math.sin(endAngle - Math.PI / 2);
+    const largeArc = angle > Math.PI ? 1 : 0;
+    const path = `M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${largeArc},1 ${x2},${y2} Z`;
+    startAngle = endAngle;
+    return (
+      <Path key={d.label} d={path} fill={d.color} stroke="#fff" strokeWidth={2} />
+    );
+  });
+
+  // Pie chart data for Medium defects
+  const mediumStatusData = [
+    { label: 'REOPEN', value: project.defects.medium.REOPEN || 0, color: '#ff2d2d' },
+    { label: 'NEW', value: project.defects.medium.NEW || 0, color: '#3b3bfa' },
+    { label: 'OPEN', value: project.defects.medium.OPEN || 0, color: '#facc15' },
+    { label: 'FIXED', value: project.defects.medium.FIXED || 0, color: '#22c55e' },
+    { label: 'CLOSED', value: project.defects.medium.CLOSED || 0, color: '#15803d' },
+    { label: 'REJECT', value: project.defects.medium.REJECT || 0, color: '#7f1d1d' },
+    { label: 'DUPLICATE', value: project.defects.medium.DUPLICATE || 0, color: '#64748b' },
+  ];
+  const mediumTotal = mediumStatusData.reduce((sum, d) => sum + d.value, 0);
+  startAngle = 0;
+  const pieSegmentsMedium = mediumStatusData.map((d, idx) => {
+    if (d.value === 0) return null;
+    const angle = (d.value / (mediumTotal || 1)) * 2 * Math.PI;
+    const endAngle = startAngle + angle;
+    const r = 70, cx = 110, cy = 110;
+    const x1 = cx + r * Math.cos(startAngle - Math.PI / 2);
+    const y1 = cy + r * Math.sin(startAngle - Math.PI / 2);
+    const x2 = cx + r * Math.cos(endAngle - Math.PI / 2);
+    const y2 = cy + r * Math.sin(endAngle - Math.PI / 2);
+    const largeArc = angle > Math.PI ? 1 : 0;
+    const path = `M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${largeArc},1 ${x2},${y2} Z`;
+    startAngle = endAngle;
+    return (
+      <Path key={d.label} d={path} fill={d.color} stroke="#fff" strokeWidth={2} />
+    );
+  });
+
+  // Pie chart data for Low defects
+  const lowStatusData = [
+    { label: 'REOPEN', value: project.defects.low.REOPEN || 0, color: '#ff2d2d' },
+    { label: 'NEW', value: project.defects.low.NEW || 0, color: '#3b3bfa' },
+    { label: 'OPEN', value: project.defects.low.OPEN || 0, color: '#facc15' },
+    { label: 'FIXED', value: project.defects.low.FIXED || 0, color: '#22c55e' },
+    { label: 'CLOSED', value: project.defects.low.CLOSED || 0, color: '#15803d' },
+    { label: 'REJECT', value: project.defects.low.REJECT || 0, color: '#7f1d1d' },
+    { label: 'DUPLICATE', value: project.defects.low.DUPLICATE || 0, color: '#64748b' },
+  ];
+  const lowTotal = lowStatusData.reduce((sum, d) => sum + d.value, 0);
+  startAngle = 0;
+  const pieSegmentsLow = lowStatusData.map((d, idx) => {
+    if (d.value === 0) return null;
+    const angle = (d.value / (lowTotal || 1)) * 2 * Math.PI;
+    const endAngle = startAngle + angle;
+    const r = 70, cx = 110, cy = 110;
+    const x1 = cx + r * Math.cos(startAngle - Math.PI / 2);
+    const y1 = cy + r * Math.sin(startAngle - Math.PI / 2);
+    const x2 = cx + r * Math.cos(endAngle - Math.PI / 2);
+    const y2 = cy + r * Math.sin(endAngle - Math.PI / 2);
+    const largeArc = angle > Math.PI ? 1 : 0;
+    const path = `M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${largeArc},1 ${x2},${y2} Z`;
+    startAngle = endAngle;
+    return (
+      <Path key={d.label} d={path} fill={d.color} stroke="#fff" strokeWidth={2} />
+    );
+  });
 
   // Helper for status label style
   const getStatusLabelStyle = (risk: RiskLevel): any => {
@@ -332,9 +446,46 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <Animated.View style={{ flex: 1, backgroundColor: bgColor }}>
+            {/* Blue gradient header with logo at top left and user image at right */}
+            <Animated.View style={{ height: 180, width: '100%', backgroundColor: headerColor, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, overflow: 'hidden', position: 'absolute', top: 0, left: 0, zIndex: 0 }}>
+                    {/* Logo at top left */}
+                    <View style={{ position: 'absolute', top: 18, left: 15, zIndex: 2, flexDirection: 'row', alignItems: 'center' }}>
+                      <Image source={require('./assets/logo.png')} style={{ width: 44, height: 44 }} resizeMode="contain" />
+                      <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600', top:-4, right:5}}> Defect Tracker </Text>
+                    </View>
+                    {/* Top right icons row */}
+                    <View style={{ position: 'absolute', top: 18, right: 18, zIndex: 2, flexDirection: 'row', alignItems: 'center' }}>
+                      {/* Notification icon */}
+                      <TouchableOpacity style={{ marginRight: -46 , bottom:2 }} activeOpacity={0.7}>
+                        <Icon name="bell" size={18} color="#fff" />
+                      </TouchableOpacity>
+                      {/* Day/Night toggle icon (sun/moon) */}
+                      <TouchableOpacity style={{ marginRight: -7, bottom: 3 }} activeOpacity={0.7} onPress={() => setIsNight(n => !n)}>
+                        <Icon name={isNight ? "moon" : "sun"} size={18} color="#fff" />
+                      </TouchableOpacity>
+                      {/* User image */}
+                                <TouchableOpacity
+                                  style={{ width: 46, height: 46, borderRadius: 22, overflow: 'hidden', borderWidth: 2, borderColor: '#fff', backgroundColor: '#e5e7eb', justifyContent: 'center', alignItems: 'center', top:59 , right:27 }}
+                                  activeOpacity={0.7}
+                                  onPress={() => navigation.navigate('Profile')}
+                                >
+                                  <Image source={require('./assets/user.jpg')} style={{ width: 46, height: 46, borderRadius: 22 }} />
+                                </TouchableOpacity>
+                              </View>
+                    {/* Greeting row (below logo, left-aligned) */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 22, paddingTop: 75, paddingBottom: 18, width: '100%' }}>
+                      <View style={{ flex: 1, marginLeft: 23 }}>
+                        <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600', marginBottom: 2 }}>Hello Zayan,</Text>
+                        <Text style={{ color: isNight ? '#cbd5e1' : '#fff', fontSize: 14, fontWeight: '300', marginTop: 2 }}>Check defect updates!</Text>
+                      </View>
+                    </View>
+                  </Animated.View>
+      
+            <ScrollView style={{ flex: 1, marginTop: 150 }} contentContainerStyle={{ paddingBottom: 32 }}> 
 
       {/* Project Selection Pills */}
+    <View style={{ backgroundColor: '#fff', borderRadius: 24, marginHorizontal: 12, padding: 18, shadowColor: '#2563eb', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.10, shadowRadius: 16, elevation: 8 }}>
       <View style={styles.projectSelectionWrap}>
         <Text style={styles.projectSelectionTitle}>Project Selection</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -395,9 +546,34 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
               </View>
             );
           })()}
-          <TouchableOpacity style={styles.chartBtn}>
+          <TouchableOpacity style={styles.chartBtn} onPress={() => setHighChartVisible(true)}>
             <Text style={styles.chartBtnText}>View Chart</Text>
           </TouchableOpacity>
+          {/* Modal Pie Chart for High Defect Status Breakdown */}
+          <Modal visible={highChartVisible} animationType="slide" transparent onRequestClose={() => setHighChartVisible(false)}>
+            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', justifyContent: 'center', alignItems: 'center' }}>
+              <View style={{ backgroundColor: '#fff', borderRadius: 18, padding: 18, width: '90%', maxHeight: '80%' }}>
+                <TouchableOpacity onPress={() => setHighChartVisible(false)} style={{ position: 'absolute', top: 14, right: 14, zIndex: 10 }}>
+                  <Icon name="x" size={26} color="#64748b" />
+                </TouchableOpacity>
+                <Text style={{ fontSize: 19, fontWeight: 'bold', color: '#222', marginBottom: 10 }}>Status Breakdown for High</Text>
+                <View style={{ alignItems: 'center', marginBottom: 8 }}>
+                  <Svg width={220} height={220}>
+                    {pieSegmentsHigh}
+                  </Svg>
+                </View>
+                {/* Legend */}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginTop: 8 }}>
+                  {highStatusData.map(d => d.value > 0 && (
+                    <View key={d.label} style={{ flexDirection: 'row', alignItems: 'center', margin: 6 }}>
+                      <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: d.color, marginRight: 7 }} />
+                      <Text style={{ fontSize: 15, color: '#222', fontWeight: '500', marginRight: 7 }}>{d.label}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </View>
+          </Modal>
         </View>
         {/* Medium */}
         <View style={[styles.defectCard, styles.defectCardMedium]}> 
@@ -429,9 +605,34 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
               </View>
             );
           })()}
-          <TouchableOpacity style={styles.chartBtn}>
+          <TouchableOpacity style={styles.chartBtn} onPress={() => setMediumChartVisible(true)}>
             <Text style={styles.chartBtnText}>View Chart</Text>
           </TouchableOpacity>
+          {/* Modal Pie Chart for Medium Defect Status Breakdown */}
+          <Modal visible={mediumChartVisible} animationType="slide" transparent onRequestClose={() => setMediumChartVisible(false)}>
+            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', justifyContent: 'center', alignItems: 'center' }}>
+              <View style={{ backgroundColor: '#fff', borderRadius: 18, padding: 18, width: '90%', maxHeight: '80%' }}>
+                <TouchableOpacity onPress={() => setMediumChartVisible(false)} style={{ position: 'absolute', top: 14, right: 14, zIndex: 10 }}>
+                  <Icon name="x" size={26} color="#64748b" />
+                </TouchableOpacity>
+                <Text style={{ fontSize: 19, fontWeight: 'bold', color: '#222', marginBottom: 10 }}>Status Breakdown for Medium</Text>
+                <View style={{ alignItems: 'center', marginBottom: 8 }}>
+                  <Svg width={220} height={220}>
+                    {pieSegmentsMedium}
+                  </Svg>
+                </View>
+                {/* Legend */}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginTop: 8 }}>
+                  {mediumStatusData.map(d => d.value > 0 && (
+                    <View key={d.label} style={{ flexDirection: 'row', alignItems: 'center', margin: 6 }}>
+                      <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: d.color, marginRight: 7 }} />
+                      <Text style={{ fontSize: 15, color: '#222', fontWeight: '500', marginRight: 7 }}>{d.label}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </View>
+          </Modal>
         </View>
         {/* Low */}
         <View style={[styles.defectCard, styles.defectCardLow]}> 
@@ -463,9 +664,34 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
               </View>
             );
           })()}
-          <TouchableOpacity style={styles.chartBtn}>
+          <TouchableOpacity style={styles.chartBtn} onPress={() => setLowChartVisible(true)}>
             <Text style={styles.chartBtnText}>View Chart</Text>
           </TouchableOpacity>
+          {/* Modal Pie Chart for Low Defect Status Breakdown */}
+          <Modal visible={lowChartVisible} animationType="slide" transparent onRequestClose={() => setLowChartVisible(false)}>
+            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', justifyContent: 'center', alignItems: 'center' }}>
+              <View style={{ backgroundColor: '#fff', borderRadius: 18, padding: 18, width: '90%', maxHeight: '80%' }}>
+                <TouchableOpacity onPress={() => setLowChartVisible(false)} style={{ position: 'absolute', top: 14, right: 14, zIndex: 10 }}>
+                  <Icon name="x" size={26} color="#64748b" />
+                </TouchableOpacity>
+                <Text style={{ fontSize: 19, fontWeight: 'bold', color: '#222', marginBottom: 10 }}>Status Breakdown for Low</Text>
+                <View style={{ alignItems: 'center', marginBottom: 8 }}>
+                  <Svg width={220} height={220}>
+                    {pieSegmentsLow}
+                  </Svg>
+                </View>
+                {/* Legend */}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginTop: 8 }}>
+                  {lowStatusData.map(d => d.value > 0 && (
+                    <View key={d.label} style={{ flexDirection: 'row', alignItems: 'center', margin: 6 }}>
+                      <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: d.color, marginRight: 7 }} />
+                      <Text style={{ fontSize: 15, color: '#222', fontWeight: '500', marginRight: 7 }}>{d.label}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </View>
+          </Modal>
         </View>
       </View>   
 
@@ -474,35 +700,105 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
         {/* Defect Density Card */}
         <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
           <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#222', marginBottom: 8 }}>Defect Density</Text>
-          <Text style={{ fontSize: 15, color: '#222', textAlign: 'center', marginBottom: 2 }}>Defect Density: <Text style={{ color: '#e11d48', fontWeight: 'bold', fontSize: 18 }}>29.53</Text></Text>
-          {/* Exact Semi-Circular Meter using SVG */}
-          <View style={{ alignItems: 'center', marginTop: 8 }}>
-            <Svg width={180} height={110}>
-              {/* Arc outline */}
-              <Path d="M20,100 A70,70 0 0,1 160,100" stroke="#e5e7eb" strokeWidth={14} fill="none" />
-              {/* Green arc */}
-              <Path d="M20,100 A70,70 0 0,1 90,30" stroke="#22c55e" strokeWidth={12} fill="none" />
-              {/* White border between segments */}
-              <Path d="M90,30 A70,70 0 0,1 90,30" stroke="#fff" strokeWidth={14} fill="none" />
-              {/* Yellow arc */}
-              <Path d="M90,30 A70,70 0 0,1 160,100" stroke="#eab308" strokeWidth={12} fill="none" />
-              {/* White border between segments */}
-              <Path d="M160,100 A70,70 0 0,1 160,100" stroke="#fff" strokeWidth={14} fill="none" />
-              {/* Red arc */}
-              <Path d="M160,100 A70,70 0 0,1 20,100" stroke="#e11d48" strokeWidth={12} fill="none" />
-              {/* Tick marks */}
-              <Path d="M87,38 L87,28" stroke="#64748b" strokeWidth={2} /> {/* 7 tick */}
-              <Path d="M155,98 L165,98" stroke="#64748b" strokeWidth={2} /> {/* 10 tick */}
-              {/* Labels */}
-              <SvgText x={12} y={108} fontSize={13} fill="#64748b">0</SvgText>
-              <SvgText x={80} y={22} fontSize={15} fill="#64748b">7</SvgText>
-              <SvgText x={168} y={108} fontSize={15} fill="#64748b">10</SvgText>
-              {/* Pointer (needle) - dark blue */}
-              <Path d="M90,100 L170,100" stroke="#334155" strokeWidth={5} />
-              {/* Center circle - dark blue */}
-              <Circle cx={90} cy={100} r={8} fill="#334155" />
-            </Svg>
-          </View>
+          {(() => {
+            // Dynamic meter logic
+            const kloc = 100; // Example value, replace with real
+            const defectCount = 449; // Example value, replace with real
+            const defectDensity = defectCount / kloc;
+            const min = 0, max = 15;
+            const cappedDensity = Math.max(min, Math.min(defectDensity, max));
+            const angle = -90 + (cappedDensity / 15) * 180;
+            // Arc helpers
+            function polarToCartesian(cx: number, cy: number, r: number, angle: number) {
+              const rad = (angle - 90) * Math.PI / 180.0;
+              return {
+                x: cx + (r * Math.cos(rad)),
+                y: cy + (r * Math.sin(rad))
+              };
+            }
+            function describeArc(cx: number, cy: number, r: number, startValue: number, endValue: number) {
+              const valueToAngle = (v: number) => -90 + (v / 15) * 180;
+              const startAngle = valueToAngle(startValue);
+              const endAngle = valueToAngle(endValue);
+              const start = polarToCartesian(cx, cy, r, endAngle);
+              const end = polarToCartesian(cx, cy, r, startAngle);
+              const largeArcFlag = endAngle - startAngle <= 180 ? '0' : '1';
+              return [
+                'M', start.x, start.y,
+                'A', r, r, 0, largeArcFlag, 0, end.x, end.y
+              ].join(' ');
+            }
+            // Arc value ranges
+            const arcGreenStart = 0, arcGreenEnd = 7;
+            const arcYellowStart = 7.1, arcYellowEnd = 10;
+            const arcRedStart = 10.1, arcRedEnd = 15;
+            // Tick positions for 0, 7, 10
+            const ticks = [0, 7, 10];
+            const valueToAngle = (v: number) => -90 + (v / 15) * 180;
+            const tickAngles = ticks.map(valueToAngle);
+            const tickRadius = 79;
+            const tickLabelRadius = 95;
+            // Needle position (filled triangle, sharp tip)
+            const needleAngle = valueToAngle(cappedDensity);
+            const needleLength = 66;
+            const baseRadius = 10; // distance from center for base points
+            const baseHalfAngle = 13; // degrees offset from needle angle for base
+            // Tip of the needle
+            const tip = polarToCartesian(100, 100, needleLength, needleAngle);
+            // Base left and right (small segment at center)
+            const baseLeft = polarToCartesian(100, 100, baseRadius, needleAngle - baseHalfAngle);
+            const baseRight = polarToCartesian(100, 100, baseRadius, needleAngle + baseHalfAngle);
+            // Color zones for legend
+            const getZoneColor = (val: number) => {
+              if (val <= 7) return '#22c55e';
+              if (val <= 10) return '#facc15';
+              return '#ef4444';
+            };
+            const zoneColor = getZoneColor(cappedDensity);
+            return (
+              <>
+                <Text style={{ fontSize: 15, color: '#222', textAlign: 'center', marginBottom: 2 }}>
+                  Defect Density: <Text style={{ color: zoneColor, fontWeight: 'bold', fontSize: 18 }}>{isNaN(defectDensity) ? '0.00' : defectDensity.toFixed(2)}</Text>
+                </Text>
+                <View style={{ alignItems: 'center', marginTop: 8 }}>
+                  <Svg width={200} height={120}>
+                    {/* Meter background */}
+                    <Path d={describeArc(100, 100, 70, 0, 15)} fill="none" stroke="#e5e7eb" strokeWidth={18} />
+                    {/* Green arc: 0-7 */}
+                    <Path d={describeArc(100, 100, 70, arcGreenStart, arcGreenEnd)} fill="none" stroke="#22c55e" strokeWidth={14} />
+                    {/* Yellow arc: 7.1-10 */}
+                    <Path d={describeArc(100, 100, 70, arcYellowStart, arcYellowEnd)} fill="none" stroke="#facc15" strokeWidth={14} />
+                    {/* Red arc: 10.1-15 */}
+                    <Path d={describeArc(100, 100, 70, arcRedStart, arcRedEnd)} fill="none" stroke="#ef4444" strokeWidth={14} />
+                    {/* Needle (filled triangle, sharp tip) */}
+                    <Polygon
+                      points={`
+                        ${tip.x},${tip.y}
+                        ${baseLeft.x},${baseLeft.y}
+                        ${baseRight.x},${baseRight.y}
+                      `}
+                      fill="#334155"
+                    />
+                    {/* Center dot */}
+                    <Circle cx={100} cy={100} r={10} fill="#334155" />
+                    {/* Tick marks and labels */}
+                    {ticks.map((tick, i) => {
+                      const a = tickAngles[i];
+                      const tickStart = polarToCartesian(100, 100, tickRadius, a);
+                      const tickEnd = polarToCartesian(100, 100, tickRadius + 8, a);
+                      const labelPos = polarToCartesian(100, 100, tickLabelRadius, a);
+                      return (
+                        <>
+                          <Path key={`tick-${tick}`} d={`M${tickStart.x},${tickStart.y} L${tickEnd.x},${tickEnd.y}`} stroke="#64748b" strokeWidth={2} />
+                          <SvgText key={`label-${tick}`} x={labelPos.x} y={labelPos.y + 5} fontSize={13} fill="#64748b" textAnchor="middle">{tick}</SvgText>
+                        </>
+                      );
+                    })}
+                  </Svg>
+                </View>
+              </>
+            );
+          })()}
         </View>
         {/* Defect Severity Index Card */}
         <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
@@ -603,10 +899,13 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
             <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
               <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', justifyContent: 'center', alignItems: 'center' }}>
                 <View style={{ backgroundColor: '#fff', borderRadius: 18, padding: 18, width: '90%', maxHeight: '70%' }}>
+                  <TouchableOpacity onPress={() => setModalVisible(false)} style={{ position: 'absolute', top: 14, right: 14, zIndex: 10 }}>
+                    <Icon name="x" size={26} color="#64748b" />
+                  </TouchableOpacity>
                   <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#222', marginBottom: 10 }}>{selectedLabel} Defects</Text>
                   {/* Table header */}
                   <View style={{ flexDirection: 'row', borderBottomWidth: 2, borderBottomColor: '#e5e7eb', paddingBottom: 6, marginBottom: 4 }}>
-                    <Text style={{ flex: 1.2, fontWeight: 'bold', color: '#2563eb', fontSize: 15 }}>Defect ID</Text>
+                    <Text style={{ flex: 1.4, fontWeight: 'bold', color: '#2563eb', fontSize: 15 }}>Defect ID</Text>
                     <Text style={{ flex: 1.5, fontWeight: 'bold', color: '#222', fontSize: 15 }}>Assigned</Text>
                     <Text style={{ flex: 1.5, fontWeight: 'bold', color: '#222', fontSize: 15 }}>Reporter</Text>
                     <Text style={{ flex: 1.2, fontWeight: 'bold', color: '#64748b', fontSize: 15 }}>Release</Text>
@@ -617,16 +916,13 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
                     keyExtractor={item => item.id}
                     renderItem={({ item }) => (
                       <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#e5e7eb', paddingVertical: 7 }}>
-                        <Text style={{ flex: 1.2, color: '#2563eb', fontWeight: 'bold', fontSize: 14 }}>{item.id}</Text>
+                        <Text style={{ flex: 1.5, color: '#2563eb', fontWeight: 'bold', fontSize: 14 }}>{item.id}</Text>
                         <Text style={{ flex: 1.5, color: '#222', fontSize: 14 }}>{item.assigned}</Text>
                         <Text style={{ flex: 1.5, color: '#222', fontSize: 14 }}>{item.reporter}</Text>
                         <Text style={{ flex: 1.2, color: '#64748b', fontSize: 14 }}>{item.release}</Text>
                       </View>
                     )}
                   />
-                  <TouchableOpacity style={{ marginTop: 14, alignSelf: 'center', backgroundColor: '#2563eb', borderRadius: 8, paddingHorizontal: 22, paddingVertical: 8 }} onPress={() => setModalVisible(false)}>
-                    <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>Close</Text>
-                  </TouchableOpacity>
                 </View>
               </View>
             </Modal>
@@ -716,15 +1012,15 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
             })()}
             {/* Y axis labels */}
             {[1,2,3,4,5].map(i => (
-              <SvgText key={i} x={10} y={180-(i-1)*30+6} fontSize={15} fill="#64748b">{i}</SvgText>
+              <SvgText key={i} x={20} y={180-(i-1)*30+6} fontSize={13} fill="#64748b">{i}</SvgText>
             ))}
             {/* X axis labels */}
             {Array.from({length:10}).map((_,i) => (
-              <SvgText key={i} x={40+(260/9)*i-12} y={195} fontSize={9} fill="#64748b">Day {i+1}</SvgText>
+              <SvgText key={i} x={40+(260/9)*i-12} y={195} fontSize={7} fill="#64748b">Day {i+1}</SvgText>
             ))}
             {/* Axis titles */}
-            <SvgText x={-25} y={9} fontSize={10} fill="#64748b" rotation={-90} textAnchor="middle">Def Count</SvgText>
-            <SvgText x={152} y={210} fontSize={11} fill="#64748b" textAnchor="middle">Time (Day)</SvgText>
+            <SvgText x={-25} y={20} fontSize={10} fill="#64748b" rotation={-90} textAnchor="middle">Def Count</SvgText>
+            <SvgText x={152} y={211} fontSize={10} fill="#64748b" textAnchor="middle">Time (Day)</SvgText>
           </Svg>
         </View>
       </View>
@@ -761,15 +1057,15 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
             })()}
             {/* Y axis labels */}
             {[1,2,3,4,5].map(i => (
-              <SvgText key={i} x={10} y={180-(i-1)*30+6} fontSize={15} fill="#64748b">{i}</SvgText>
+              <SvgText key={i} x={20} y={180-(i-1)*30+6} fontSize={13} fill="#64748b">{i}</SvgText>
             ))}
             {/* X axis labels */}
             {Array.from({length:10}).map((_,i) => (
-              <SvgText key={i} x={40+(260/9)*i-12} y={195} fontSize={9} fill="#64748b">Day {i+1}</SvgText>
+              <SvgText key={i} x={40+(260/9)*i-12} y={195} fontSize={7} fill="#64748b">Day {i+1}</SvgText>
             ))}
             {/* Axis titles */}
-            <SvgText x={-45} y={9} fontSize={10} fill="#64748b" rotation={-90}>Def Count</SvgText>
-            <SvgText x={122} y={210} fontSize={11} fill="#64748b">Time (Day)</SvgText>
+            <SvgText x={-45} y={20} fontSize={10} fill="#64748b" rotation={-90}>Def Count</SvgText>
+            <SvgText x={122} y={211} fontSize={10} fill="#64748b">Time (Day)</SvgText>
           </Svg>
         </View>
       </View>
@@ -820,7 +1116,8 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
           </View>
         );
       })()}
-      
+      </View>
     </ScrollView>
+    </Animated.View>
   );
 }

@@ -22,7 +22,7 @@ const styles = StyleSheet.create({
   artImage: {
     width: 350,
     height: 220,
-    marginBottom: -6,
+    marginBottom: -7
   },
   // card and iconCircle removed
   pageTitle: {
@@ -37,7 +37,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#ebeefa',
     textAlign: 'center',
-    marginBottom: 19,
+    marginBottom: 18,
     lineHeight: 20,
   },
   label: {
@@ -119,6 +119,7 @@ const styles = StyleSheet.create({
 });
 
 
+
 function LoginScreen({ navigation }) {
   // Animation setup
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -141,6 +142,7 @@ function LoginScreen({ navigation }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = () => {
     if (username === '' || password === '') {
@@ -175,14 +177,25 @@ function LoginScreen({ navigation }) {
         placeholderTextColor="#94a3b8"
       />
       <Text style={styles.label}>Password</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Enter your password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        placeholderTextColor="#94a3b8"
-      />
+      <View style={{ width: '77%', marginBottom: 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, borderWidth: 0, paddingHorizontal: 12, paddingVertical: 2 }}>
+          <TextInput
+            style={{ flex: 1, paddingVertical: 11, fontSize: 16, color: '#232B5D', backgroundColor: 'transparent' }}
+            placeholder="Enter your password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPassword}
+            placeholderTextColor="#94a3b8"
+          />
+          <TouchableOpacity
+            onPress={() => setShowPassword(v => !v)}
+            style={{ paddingHorizontal: 6, height: 36, justifyContent: 'center', alignItems: 'center' }}
+            activeOpacity={0.7}
+          >
+            <Icon name={showPassword ? 'eye' : 'eye-off'} size={16} color="#64748b" />
+          </TouchableOpacity>
+        </View>
+      </View>
       <View style={styles.optionsRow}>
         <View style={styles.checkboxRow}>
           <TouchableOpacity onPress={() => setRememberMe(!rememberMe)} style={styles.checkbox}>

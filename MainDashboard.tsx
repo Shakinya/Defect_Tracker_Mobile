@@ -6,8 +6,9 @@ const riskColors = {
 };
 
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import { Image } from 'react-native';
 
 const projects = [
   { id: 1, name: 'Defect Tracker', risk: 'High', defects: { high: 3, medium: 1, low: 0 } },
@@ -453,25 +454,32 @@ const styles = StyleSheet.create({
 
 
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-type RootStackParamList = { ProjectDashboard: { projectId: number }; };
+type RootStackParamList = {
+  ProjectDashboard: { projectId: number };
+  Profile: undefined;
+};
 
 interface MainDashboardProps {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'ProjectDashboard'>;
+  navigation: NativeStackNavigationProp<RootStackParamList>;
 }
 
 export default function MainDashboard({ navigation }: MainDashboardProps) {
   const [filter, setFilter] = useState('All');
+  const [isNight, setIsNight] = useState(false);
+  const [bgAnim, setBgAnim] = useState(new (require('react-native')).Animated.Value(0));
   const highCount = projects.filter(p => p.risk === 'High').length;
   const mediumCount = projects.filter(p => p.risk === 'Medium').length;
   const lowCount = projects.filter(p => p.risk === 'Low').length;
 
+  // Sort projects by risk order: High, Medium, Low
+  const riskOrder: Record<'High' | 'Medium' | 'Low', number> = { High: 0, Medium: 1, Low: 2 };
   const filteredProjects =
     filter === 'All'
-      ? projects
+      ? [...projects].sort((a, b) => riskOrder[a.risk as 'High' | 'Medium' | 'Low'] - riskOrder[b.risk as 'High' | 'Medium' | 'Low'])
       : projects.filter(p => p.risk === filter);
 
   const filterPills = [
-    { key: 'All', label: 'All Projects', color: '#2563eb' },
+    { key: 'All', label: 'All Projects', color: '#1B3C53' },
     { key: 'High', label: 'High Risk', color: riskColors.High },
     { key: 'Medium', label: 'Medium Risk', color: riskColors.Medium },
     { key: 'Low', label: 'Low Risk', color: riskColors.Low }
@@ -486,8 +494,8 @@ export default function MainDashboard({ navigation }: MainDashboardProps) {
           <TouchableOpacity
             style={[styles.filterPill, {
               backgroundColor: undefined,
-              borderColor: '#2563eb',
-              shadowColor: '#2563eb',
+              borderColor: '#1B3C53',
+              shadowColor: '#1B3C53',
               shadowOpacity: 0.15,
               shadowRadius: 12,
               elevation: 4,
@@ -523,7 +531,7 @@ export default function MainDashboard({ navigation }: MainDashboardProps) {
                 top: 0,
                 bottom: 0,
                 borderRadius: 18,
-                backgroundColor: '#3b82f6',
+                backgroundColor: '#365e7a',
                 opacity: 0.65,
               }} />
             </View>
@@ -548,137 +556,188 @@ export default function MainDashboard({ navigation }: MainDashboardProps) {
     );
   });
 
+  // Animate background color on toggle
+  React.useEffect(() => {
+    require('react-native').Animated.timing(bgAnim, {
+      toValue: isNight ? 1 : 0,
+      duration: 500,
+      useNativeDriver: false,
+    }).start();
+  }, [isNight]);
+
+  const bgColor = bgAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#ebf3faff', '#101624'],
+  });
+  const headerColor = bgAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#1B3C53', '#181e2b'],
+  });
+  const cardColor = bgAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#fff', '#232a3a'],
+  });
+
   return (
-    <ScrollView style={styles.container}>
-      <View>
-        <Text style={styles.title}>Dashboard Overview</Text>
-        <View style={styles.underline} />
-        <Text style={styles.subtitle}>
-          Gain insights into your projects with real-time health metrics and status summaries
-        </Text>
-
-        {/* Section Header */}
-        <View style={styles.sectionHeaderRow}>
-          <View style={styles.sectionAccent} />
-          <Text style={styles.sectionHeader}>Project Status Insights</Text>
+    <Animated.View style={{ flex: 1, backgroundColor: bgColor }}>
+      {/* Blue gradient header with logo at top left and user image at right */}
+      <Animated.View style={{ height: 180, width: '100%', backgroundColor: headerColor, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, overflow: 'hidden', position: 'absolute', top: 0, left: 0, zIndex: 0 }}>
+        {/* Logo at top left */}
+        <View style={{ position: 'absolute', top: 18, left: 15, zIndex: 2, flexDirection: 'row', alignItems: 'center' }}>
+          <Image source={require('./assets/logo.png')} style={{ width: 44, height: 44 }} resizeMode="contain" />
+          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600', top:-4, right:5}}> Defect Tracker </Text>
         </View>
-        <View style={styles.sectionUnderline} />
-
-        {/* Summary Cards - Horizontal Row, icon at left, text at right, count between title and subtitle, dot at top right */}
-        <View style={styles.statusCardsContainer}>
-          {/* High Risk Card */}
-          <View style={[styles.statusCardRow, { borderColor: riskColors.High }]}> 
-            {/* Dot at top right */}
-            <View style={styles.statusCardDotWrap}>
-              <View style={[styles.statusCardDot, { backgroundColor: riskColors.High }]} />
-            </View>
-            <View style={styles.statusCardLeftIconWrap}>
-              <View style={[styles.statusCardLeftCircle, { backgroundColor: riskColors.High }]}> 
-                <Icon name="alert-circle" size={32} color="#fff" />
-              </View>
-            </View>
-            <View style={styles.statusCardTextCol}>
-              <Text style={styles.statusCardTitleExactLeft}>High Risk Projects</Text>
-              <Text style={[styles.statusCardCountExactLeft, { color: riskColors.High }]}>{highCount}</Text>
-              <Text style={[styles.statusCardDescExactLeft, { color: riskColors.High }]}>Immediate attention required</Text>
-            </View>
-          </View>
-          {/* Medium Risk Card */}
-          <View style={[styles.statusCardRow, { borderColor: riskColors.Medium }]}> 
-            {/* Dot at top right */}
-            <View style={styles.statusCardDotWrap}>
-              <View style={[styles.statusCardDot, { backgroundColor: riskColors.Medium }]} />
-            </View>
-            <View style={styles.statusCardLeftIconWrap}>
-              <View style={[styles.statusCardLeftCircle, { backgroundColor: riskColors.Medium }]}> 
-                <Icon name="clock" size={32} color="#fff" />
-              </View>
-            </View>
-            <View style={styles.statusCardTextCol}>
-              <Text style={styles.statusCardTitleExactLeft}>Medium Risk Projects</Text>
-              <Text style={[styles.statusCardCountExactLeft, { color: riskColors.Medium }]}>{mediumCount}</Text>
-              <Text style={[styles.statusCardDescExactLeft, { color: riskColors.Medium }]}>Monitor progress closely</Text>
-            </View>
-          </View>
-          {/* Low Risk Card */}
-          <View style={[styles.statusCardRow, { borderColor: riskColors.Low }]}> 
-            {/* Dot at top right */}
-            <View style={styles.statusCardDotWrap}>
-              <View style={[styles.statusCardDot, { backgroundColor: riskColors.Low }]} />
-            </View>
-            <View style={styles.statusCardLeftIconWrap}>
-              <View style={[styles.statusCardLeftCircle, { backgroundColor: riskColors.Low }]}> 
-                <Icon name="check-circle" size={32} color="#fff" />
-              </View>
-            </View>
-            <View style={styles.statusCardTextCol}>
-              <Text style={styles.statusCardTitleExactLeft}>Low Risk Projects</Text>
-              <Text style={[styles.statusCardCountExactLeft, { color: riskColors.Low }]}>{lowCount}</Text>
-              <Text style={[styles.statusCardDescExactLeft, { color: riskColors.Low }]}>Stable and on track</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Divider */}
-        <View style={styles.divider} />
-
-        {/* All Projects Header */}
-        <Text style={styles.projectsHeader}>All Projects</Text>
-
-        <View style={styles.filterRow}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterPillsScroll}
+        {/* Top right icons row */}
+        <View style={{ position: 'absolute', top: 18, right: 18, zIndex: 2, flexDirection: 'row', alignItems: 'center' }}>
+          {/* Notification icon */}
+          <TouchableOpacity style={{ marginRight: -46 , bottom:2 }} activeOpacity={0.7}>
+            <Icon name="bell" size={18} color="#fff" />
+          </TouchableOpacity>
+          {/* Day/Night toggle icon (sun/moon) */}
+          <TouchableOpacity style={{ marginRight: -7, bottom: 3 }} activeOpacity={0.7} onPress={() => setIsNight(n => !n)}>
+            <Icon name={isNight ? "moon" : "sun"} size={18} color="#fff" />
+          </TouchableOpacity>
+          {/* User image */}
+          <TouchableOpacity
+            style={{ width: 46, height: 46, borderRadius: 22, overflow: 'hidden', borderWidth: 2, borderColor: '#fff', backgroundColor: '#e5e7eb', justifyContent: 'center', alignItems: 'center', top:59 , right:27 }}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('Profile')}
           >
-            <View style={styles.filterPillsRow}>
-              {renderFilterPills}
-            </View>
-          </ScrollView>
+            <Image source={require('./assets/user.jpg')} style={{ width: 46, height: 46, borderRadius: 22 }} />
+          </TouchableOpacity>
         </View>
-
-        {/* Projects Grid */}
-        <View style={styles.projectsGrid}>
-          {filteredProjects.map(project => {
-            // Gradient colors for High/Low risk
-            let gradientColors;
-            if (project.risk === 'High') {
-              gradientColors = ['#ad0c0c', '#b71c1c'];
-            } else if (project.risk === 'Low') {
-              gradientColors = ['#0b9c40', '#038c35'];
-            } else {
-              gradientColors = ['#d9c10d', '#facc15'];
-            }
-            return (
-              <TouchableOpacity
-                key={project.id}
-                style={styles.projectCard}
-                activeOpacity={0.85}
-                onPress={() => navigation.navigate('ProjectDashboard', { projectId: project.id })}
-              >
-                {/* Gradient background */}
-                <View style={[styles.projectCircle, {
-                  backgroundColor: gradientColors[0],
-                }]} />
-                <View style={[styles.projectCircle, {
-                  backgroundColor: gradientColors[1],
-                  opacity: 0.7,
-                  position: 'absolute',
-                  left: 0,
-                  top: 0,
-                }]} />
-                <View style={{ alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-                  <Icon name="check-circle" size={20} color="#fff" style={styles.projectIcon} />
-                  <Text style={styles.projectName}>{project.name}</Text>
-                  <View style={styles.riskLabel}>
-                    <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 10 }}>{project.risk} Risk</Text>
-                  </View>
+        {/* Greeting row (below logo, left-aligned) */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 22, paddingTop: 75, paddingBottom: 18, width: '100%' }}>
+          <View style={{ flex: 1, marginLeft: 23 }}>
+            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600', marginBottom: 2 }}>Hello Zayan,</Text>
+            <Text style={{ color: isNight ? '#cbd5e1' : '#fff', fontSize: 14, fontWeight: '300', marginTop: 2 }}>Check defect updates!</Text>
+          </View>
+        </View>
+      </Animated.View>
+    
+      {/* Main content overlay card */}
+      <ScrollView style={{ flex: 1, marginTop: 150 }} contentContainerStyle={{ paddingBottom: 32 }}>
+        <Animated.View style={{ backgroundColor: cardColor, borderRadius: 24, marginHorizontal: 12, padding: 18, shadowColor: isNight ? '#181e2b' : '#2563eb', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.10, shadowRadius: 16, elevation: 8 }}>
+          <Text style={{ fontSize: 28, fontWeight: 'bold', color: isNight ? '#e0e7ff' : '#1B3C53', textAlign: 'center', marginBottom: 4 }}>Dashboard Overview</Text>
+          
+          <View style={{ height: 4, width: 80, backgroundColor: '#6366f1', alignSelf: 'center', borderRadius: 2, marginBottom: 13 }} />
+          <Text style={{ fontSize: 15, color: isNight ? '#94a3b8' : '#64748b', textAlign: 'center', marginBottom: 19 }}>
+            Gain insights into your projects with real-time health metrics and status summaries
+          </Text>
+          {/* Section Header */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: isNight ? '#e0e7ff' : '#222' }}>Project Status Insights</Text>
+          </View>
+          <View style={{ height: 1, backgroundColor: '#e0e7ff', marginBottom: 22 }} />
+          {/* Summary Cards - Horizontal Row, icon at left, text at right, count between title and subtitle, dot at top right */}
+          <View style={styles.statusCardsContainer}>
+            {/* High Risk Card */}
+            <View style={[styles.statusCardRow, { borderColor: riskColors.High }]}> 
+              <View style={styles.statusCardDotWrap}>
+                <View style={[styles.statusCardDot, { backgroundColor: riskColors.High }]} />
+              </View>
+              <View style={styles.statusCardLeftIconWrap}>
+                <View style={[styles.statusCardLeftCircle, { backgroundColor: riskColors.High }]}> 
+                  <Icon name="alert-circle" size={32} color="#fff" />
                 </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </View>
-    </ScrollView>
+              </View>
+              <View style={styles.statusCardTextCol}>
+                <Text style={styles.statusCardTitleExactLeft}>High Risk Projects</Text>
+                <Text style={[styles.statusCardCountExactLeft, { color: riskColors.High }]}>{highCount}</Text>
+                <Text style={[styles.statusCardDescExactLeft, { color: riskColors.High }]}>Immediate attention required</Text>
+              </View>
+            </View>
+            {/* Medium Risk Card */}
+            <View style={[styles.statusCardRow, { borderColor: riskColors.Medium }]}> 
+              <View style={styles.statusCardDotWrap}>
+                <View style={[styles.statusCardDot, { backgroundColor: riskColors.Medium }]} />
+              </View>
+              <View style={styles.statusCardLeftIconWrap}>
+                <View style={[styles.statusCardLeftCircle, { backgroundColor: riskColors.Medium }]}> 
+                  <Icon name="clock" size={32} color="#fff" />
+                </View>
+              </View>
+              <View style={styles.statusCardTextCol}>
+                <Text style={styles.statusCardTitleExactLeft}>Medium Risk Projects</Text>
+                <Text style={[styles.statusCardCountExactLeft, { color: riskColors.Medium }]}>{mediumCount}</Text>
+                <Text style={[styles.statusCardDescExactLeft, { color: riskColors.Medium }]}>Monitor progress closely</Text>
+              </View>
+            </View>
+            {/* Low Risk Card */}
+            <View style={[styles.statusCardRow, { borderColor: riskColors.Low }]}> 
+              <View style={styles.statusCardDotWrap}>
+                <View style={[styles.statusCardDot, { backgroundColor: riskColors.Low }]} />
+              </View>
+              <View style={styles.statusCardLeftIconWrap}>
+                <View style={[styles.statusCardLeftCircle, { backgroundColor: riskColors.Low }]}> 
+                  <Icon name="check-circle" size={32} color="#fff" />
+                </View>
+              </View>
+              <View style={styles.statusCardTextCol}>
+                <Text style={styles.statusCardTitleExactLeft}>Low Risk Projects</Text>
+                <Text style={[styles.statusCardCountExactLeft, { color: riskColors.Low }]}>{lowCount}</Text>
+                <Text style={[styles.statusCardDescExactLeft, { color: riskColors.Low }]}>Stable and on track</Text>
+              </View>
+            </View>
+          </View>
+          {/* Divider */}
+          <View style={styles.divider} />
+          {/* All Projects Header */}
+          <Text style={[styles.projectsHeader, { color: isNight ? '#e0e7ff' : '#222' }]}>All Projects</Text>
+          <View style={styles.filterRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterPillsScroll}
+            >
+              <View style={styles.filterPillsRow}>
+                {renderFilterPills}
+              </View>
+            </ScrollView>
+          </View>
+          {/* Projects Grid */}
+          <View style={styles.projectsGrid}>
+            {filteredProjects.map(project => {
+              // Gradient colors for High/Low risk
+              let gradientColors;
+              if (project.risk === 'High') {
+                gradientColors = ['#ad0c0c', '#b71c1c'];
+              } else if (project.risk === 'Low') {
+                gradientColors = ['#0b9c40', '#038c35'];
+              } else {
+                gradientColors = ['#d9c10d', '#facc15'];
+              }
+              return (
+                <TouchableOpacity
+                  key={project.id}
+                  style={styles.projectCard}
+                  activeOpacity={0.85}
+                  onPress={() => navigation.navigate('ProjectDashboard', { projectId: project.id })}
+                >
+                  {/* Gradient background */}
+                  <View style={[styles.projectCircle, {
+                    backgroundColor: gradientColors[0],
+                  }]} />
+                  <View style={[styles.projectCircle, {
+                    backgroundColor: gradientColors[1],
+                    opacity: 0.7,
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                  }]} />
+                  <View style={{ alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+                    <Icon name="check-circle" size={20} color="#fff" style={styles.projectIcon} />
+                    <Text style={styles.projectName}>{project.name}</Text>
+                    <View style={styles.riskLabel}>
+                      <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 10 }}>{project.risk} Risk</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </Animated.View>
+      </ScrollView>
+    </Animated.View>
   );
 }

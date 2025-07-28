@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   topArtWrap: {
-    marginTop: -5,
+    marginTop: -12,
     marginBottom: 18,
     alignItems: 'center',
   },
@@ -69,6 +69,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: 7,
     letterSpacing: 1.2,
+    marginTop:-25,
   },
   subtitle: {
     fontSize: 15,

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableWithoutFeedback, FlatList } from 'react-native';
 import { ScrollView, TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import type { RouteProp } from '@react-navigation/native';
@@ -291,6 +291,7 @@ type ProjectDefectData = {
     low: DefectBreakdown;
   };
 };
+type DefectItem = { id: string; assigned: string; reporter: string; release: string };
 
 type RootStackParamList = {
   ProjectDashboard: { projectId: number };
@@ -466,7 +467,7 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
             <Text style={styles.chartBtnText}>View Chart</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </View>   
 
       {/* Defect Density, Severity Index, Defect to Remark Ratio */}
       <View style={{ flexDirection: 'column', gap: 14, marginBottom: 18 }}>
@@ -477,19 +478,29 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
           {/* Exact Semi-Circular Meter using SVG */}
           <View style={{ alignItems: 'center', marginTop: 8 }}>
             <Svg width={180} height={110}>
+              {/* Arc outline */}
+              <Path d="M20,100 A70,70 0 0,1 160,100" stroke="#e5e7eb" strokeWidth={14} fill="none" />
               {/* Green arc */}
               <Path d="M20,100 A70,70 0 0,1 90,30" stroke="#22c55e" strokeWidth={12} fill="none" />
+              {/* White border between segments */}
+              <Path d="M90,30 A70,70 0 0,1 90,30" stroke="#fff" strokeWidth={14} fill="none" />
               {/* Yellow arc */}
               <Path d="M90,30 A70,70 0 0,1 160,100" stroke="#eab308" strokeWidth={12} fill="none" />
+              {/* White border between segments */}
+              <Path d="M160,100 A70,70 0 0,1 160,100" stroke="#fff" strokeWidth={14} fill="none" />
               {/* Red arc */}
               <Path d="M160,100 A70,70 0 0,1 20,100" stroke="#e11d48" strokeWidth={12} fill="none" />
-              {/* Ticks and labels */}
-              <SvgText x={20} y={105} fontSize={13} fill="#222">0</SvgText>
-              <SvgText x={85} y={25} fontSize={13} fill="#222">7</SvgText>
-              <SvgText x={160} y={105} fontSize={13} fill="#222">10</SvgText>
-              {/* Pointer (needle) */}
-              <Path d="M90,100 L170,100" stroke="#222" strokeWidth={4} />
-              <Circle cx={90} cy={100} r={7} fill="#222" />
+              {/* Tick marks */}
+              <Path d="M87,38 L87,28" stroke="#64748b" strokeWidth={2} /> {/* 7 tick */}
+              <Path d="M155,98 L165,98" stroke="#64748b" strokeWidth={2} /> {/* 10 tick */}
+              {/* Labels */}
+              <SvgText x={12} y={108} fontSize={13} fill="#64748b">0</SvgText>
+              <SvgText x={80} y={22} fontSize={15} fill="#64748b">7</SvgText>
+              <SvgText x={168} y={108} fontSize={15} fill="#64748b">10</SvgText>
+              {/* Pointer (needle) - dark blue */}
+              <Path d="M90,100 L170,100" stroke="#334155" strokeWidth={5} />
+              {/* Center circle - dark blue */}
+              <Circle cx={90} cy={100} r={8} fill="#334155" />
             </Svg>
           </View>
         </View>
@@ -518,6 +529,298 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
           </View>
         </View>
       </View>
+
+      {/* Defects Reopened Multiple Times Pie Chart (Interactive) */}
+      {(() => {
+        // Dummy defect data for each category
+        const defectReopenData = [
+          { label: '2 times', value: 5, color: '#4285f4', defects: [
+            { id: 'D-101', assigned: 'Alice', reporter: 'Bob', release: 'R1.2' },
+            { id: 'D-102', assigned: 'Charlie', reporter: 'Dave', release: 'R1.2' },
+            { id: 'D-103', assigned: 'Eve', reporter: 'Frank', release: 'R1.3' },
+            { id: 'D-104', assigned: 'Grace', reporter: 'Heidi', release: 'R1.3' },
+            { id: 'D-105', assigned: 'Ivan', reporter: 'Judy', release: 'R1.4' },
+          ] },
+          { label: '3 times', value: 2, color: '#34a853', defects: [
+            { id: 'D-106', assigned: 'Mallory', reporter: 'Oscar', release: 'R1.4' },
+            { id: 'D-107', assigned: 'Peggy', reporter: 'Sybil', release: 'R1.5' },
+          ] },
+          { label: '4 times', value: 1, color: '#fbbc05', defects: [
+            { id: 'D-108', assigned: 'Trent', reporter: 'Victor', release: 'R1.5' },
+          ] },
+          { label: '5 times', value: 1, color: '#ea4335', defects: [
+            { id: 'D-109', assigned: 'Walter', reporter: 'Yvonne', release: 'R1.6' },
+          ] },
+          { label: '>5 times', value: 1, color: '#9b59b6', defects: [
+            { id: 'D-110', assigned: 'Zara', reporter: 'Quinn', release: 'R1.6' },
+          ] },
+        ];
+        const total = defectReopenData.reduce((sum, d) => sum + d.value, 0);
+        const [modalVisible, setModalVisible] = useState(false);
+        const [selectedDefects, setSelectedDefects] = useState<DefectItem[]>([]);
+        const [selectedLabel, setSelectedLabel] = useState('');
+
+        // Pie chart segment generator
+        let startAngle = 0;
+        const pieSegments = defectReopenData.map((d, idx) => {
+          const angle = (d.value / total) * 2 * Math.PI;
+          const endAngle = startAngle + angle;
+          // SVG arc math
+          const r = 80, cx = 90, cy = 90;
+          const x1 = cx + r * Math.cos(startAngle - Math.PI / 2);
+          const y1 = cy + r * Math.sin(startAngle - Math.PI / 2);
+          const x2 = cx + r * Math.cos(endAngle - Math.PI / 2);
+          const y2 = cy + r * Math.sin(endAngle - Math.PI / 2);
+          const largeArc = angle > Math.PI ? 1 : 0;
+          const path = `M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${largeArc},1 ${x2},${y2} Z`;
+          const seg = (
+            <TouchableWithoutFeedback key={d.label} onPress={() => { setSelectedDefects(d.defects); setSelectedLabel(d.label); setModalVisible(true); }}>
+              <Path d={path} fill={d.color} stroke="#fff" strokeWidth={2} />
+            </TouchableWithoutFeedback>
+          );
+          startAngle = endAngle;
+          return seg;
+        });
+
+        return (
+          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#222', marginBottom: 8 }}>Defects Reopened Multiple Times</Text>
+            <View style={{ alignItems: 'center', marginBottom: 8 }}>
+              <Svg width={180} height={180}>
+                {pieSegments}
+              </Svg>
+            </View>
+            {/* Legend */}
+            <View style={{ flexDirection: 'column', marginTop: 4, marginLeft: 8 }}>
+              {defectReopenData.map(d => (
+                <View key={d.label} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+                  <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: d.color, marginRight: 7 }} />
+                  <Text style={{ fontSize: 15, color: '#222', fontWeight: '500' }}>{d.label}: <Text style={{ fontWeight: 'bold' }}>{d.value}</Text> <Text style={{ color: '#64748b', fontSize: 13 }}>({((d.value/total)*100).toFixed(1)}%)</Text></Text>
+                </View>
+              ))}
+            </View>
+            {/* Modal for defect list as a responsive table */}
+            <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
+              <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', justifyContent: 'center', alignItems: 'center' }}>
+                <View style={{ backgroundColor: '#fff', borderRadius: 18, padding: 18, width: '90%', maxHeight: '70%' }}>
+                  <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#222', marginBottom: 10 }}>{selectedLabel} Defects</Text>
+                  {/* Table header */}
+                  <View style={{ flexDirection: 'row', borderBottomWidth: 2, borderBottomColor: '#e5e7eb', paddingBottom: 6, marginBottom: 4 }}>
+                    <Text style={{ flex: 1.2, fontWeight: 'bold', color: '#2563eb', fontSize: 15 }}>Defect ID</Text>
+                    <Text style={{ flex: 1.5, fontWeight: 'bold', color: '#222', fontSize: 15 }}>Assigned</Text>
+                    <Text style={{ flex: 1.5, fontWeight: 'bold', color: '#222', fontSize: 15 }}>Reporter</Text>
+                    <Text style={{ flex: 1.2, fontWeight: 'bold', color: '#64748b', fontSize: 15 }}>Release</Text>
+                  </View>
+                  {/* Table rows */}
+                  <FlatList
+                    data={selectedDefects}
+                    keyExtractor={item => item.id}
+                    renderItem={({ item }) => (
+                      <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#e5e7eb', paddingVertical: 7 }}>
+                        <Text style={{ flex: 1.2, color: '#2563eb', fontWeight: 'bold', fontSize: 14 }}>{item.id}</Text>
+                        <Text style={{ flex: 1.5, color: '#222', fontSize: 14 }}>{item.assigned}</Text>
+                        <Text style={{ flex: 1.5, color: '#222', fontSize: 14 }}>{item.reporter}</Text>
+                        <Text style={{ flex: 1.2, color: '#64748b', fontSize: 14 }}>{item.release}</Text>
+                      </View>
+                    )}
+                  />
+                  <TouchableOpacity style={{ marginTop: 14, alignSelf: 'center', backgroundColor: '#2563eb', borderRadius: 8, paddingHorizontal: 22, paddingVertical: 8 }} onPress={() => setModalVisible(false)}>
+                    <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>Close</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Modal>
+          </View>
+        );
+      })()}
+
+      {/* Defect Distribution by Type Pie Chart */}
+      {(() => {
+        // Dummy defect type data
+        const defectTypeData = [
+          { label: 'Functionality', value: 238, color: '#4285f4' },
+          { label: 'UI', value: 82, color: '#00bfae' },
+          { label: 'Usability', value: 30, color: '#fbbc05' },
+          { label: 'Validation', value: 103, color: '#ea4335' },
+        ];
+        const total = defectTypeData.reduce((sum, d) => sum + d.value, 0);
+        // Pie chart segment generator
+        let startAngle = 0;
+        const pieSegments = defectTypeData.map((d, idx) => {
+          const angle = (d.value / total) * 2 * Math.PI;
+          const endAngle = startAngle + angle;
+          // SVG arc math
+          const r = 80, cx = 90, cy = 90;
+          const x1 = cx + r * Math.cos(startAngle - Math.PI / 2);
+          const y1 = cy + r * Math.sin(startAngle - Math.PI / 2);
+          const x2 = cx + r * Math.cos(endAngle - Math.PI / 2);
+          const y2 = cy + r * Math.sin(endAngle - Math.PI / 2);
+          const largeArc = angle > Math.PI ? 1 : 0;
+          const path = `M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${largeArc},1 ${x2},${y2} Z`;
+          startAngle = endAngle;
+          return (
+            <Path key={d.label} d={path} fill={d.color} stroke="#fff" strokeWidth={2} />
+          );
+        });
+        return (
+          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#222', marginBottom: 8 }}>Defect Distribution by Type</Text>
+            <View style={{ alignItems: 'center', marginBottom: 8 }}>
+              <Svg width={180} height={180}>
+                {pieSegments}
+              </Svg>
+            </View>
+            {/* Legend */}
+            <View style={{ flexDirection: 'column', marginTop: 4, marginLeft: 8 }}>
+              {defectTypeData.map(d => (
+                <View key={d.label} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+                  <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: d.color, marginRight: 7 }} />
+                  <Text style={{ fontSize: 15, color: '#222', fontWeight: '500' }}>{d.label}: <Text style={{ fontWeight: 'bold' }}>{d.value}</Text> <Text style={{ color: '#64748b', fontSize: 13 }}>({((d.value/total)*100).toFixed(1)}%)</Text></Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        );
+      })()}
+
+      {/* Time to Find Defects Line Chart (Single) */}
+      <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 18, marginBottom: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
+        <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#222', marginBottom: 12 }}>Time to Find Defects</Text>
+        <View style={{ alignItems: 'center' }}>
+          <Svg width={320} height={213}>
+            {/* Axes */}
+            <Path d="M40,180 L300,180" stroke="#222" strokeWidth={2} />
+            <Path d="M40,180 L40,30" stroke="#222" strokeWidth={2} />
+            {/* Grid lines */}
+            {[1,2,3,4].map(i => (
+              <Path key={i} d={`M40,${180-i*30} L300,${180-i*30}`} stroke="#e5e7eb" strokeWidth={1} />
+            ))}
+            {/* Dummy data points */}
+            {(() => {
+              const data = [2,3,1,4,2,3,2,1,2,1];
+              const points = data.map((v,i) => {
+                const x = 40 + (260/9)*i;
+                const y = 180 - (v-1)*37.5;
+                return { x, y };
+              });
+              // Line path
+              const linePath = points.map((p,i) => i===0 ? `M${p.x},${p.y}` : `L${p.x},${p.y}`).join(' ');
+              return (
+                <>
+                  <Path d={linePath} stroke="#2563eb" strokeWidth={3} fill="none" />
+                  {points.map((p,i) => (
+                    <Circle key={i} cx={p.x} cy={p.y} r={6} fill="#2563eb" stroke="#fff" strokeWidth={2} />
+                  ))}
+                </>
+              );
+            })()}
+            {/* Y axis labels */}
+            {[1,2,3,4,5].map(i => (
+              <SvgText key={i} x={10} y={180-(i-1)*30+6} fontSize={15} fill="#64748b">{i}</SvgText>
+            ))}
+            {/* X axis labels */}
+            {Array.from({length:10}).map((_,i) => (
+              <SvgText key={i} x={40+(260/9)*i-12} y={195} fontSize={9} fill="#64748b">Day {i+1}</SvgText>
+            ))}
+            {/* Axis titles */}
+            <SvgText x={-25} y={9} fontSize={10} fill="#64748b" rotation={-90} textAnchor="middle">Def Count</SvgText>
+            <SvgText x={152} y={210} fontSize={11} fill="#64748b" textAnchor="middle">Time (Day)</SvgText>
+          </Svg>
+        </View>
+      </View>
+      {/* Time to Fix Defects Line Chart (Single) */}
+      <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 18, marginBottom: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
+        <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#222', marginBottom: 12 }}>Time to Fix Defects</Text>
+        <View style={{ alignItems: 'center' }}>
+          <Svg width={320} height={215}>
+            {/* Axes */}
+            <Path d="M40,180 L300,180" stroke="#222" strokeWidth={2} />
+            <Path d="M40,180 L40,30" stroke="#222" strokeWidth={2} />
+            {/* Grid lines */}
+            {[1,2,3,4].map(i => (
+              <Path key={i} d={`M40,${180-i*30} L300,${180-i*30}`} stroke="#e5e7eb" strokeWidth={1} />
+            ))}
+            {/* Dummy data points */}
+            {(() => {
+              const data = [3,2,4,3,2,3,2,2,1,2];
+              const points = data.map((v,i) => {
+                const x = 40 + (260/9)*i;
+                const y = 180 - (v-1)*37.5;
+                return { x, y };
+              });
+              // Line path
+              const linePath = points.map((p,i) => i===0 ? `M${p.x},${p.y}` : `L${p.x},${p.y}`).join(' ');
+              return (
+                <>
+                  <Path d={linePath} stroke="#22c55e" strokeWidth={3} fill="none" />
+                  {points.map((p,i) => (
+                    <Circle key={i} cx={p.x} cy={p.y} r={6} fill="#22c55e" stroke="#fff" strokeWidth={2} />
+                  ))}
+                </>
+              );
+            })()}
+            {/* Y axis labels */}
+            {[1,2,3,4,5].map(i => (
+              <SvgText key={i} x={10} y={180-(i-1)*30+6} fontSize={15} fill="#64748b">{i}</SvgText>
+            ))}
+            {/* X axis labels */}
+            {Array.from({length:10}).map((_,i) => (
+              <SvgText key={i} x={40+(260/9)*i-12} y={195} fontSize={9} fill="#64748b">Day {i+1}</SvgText>
+            ))}
+            {/* Axis titles */}
+            <SvgText x={-45} y={9} fontSize={10} fill="#64748b" rotation={-90}>Def Count</SvgText>
+            <SvgText x={122} y={210} fontSize={11} fill="#64748b">Time (Day)</SvgText>
+          </Svg>
+        </View>
+      </View>
+
+      {/* Defects by Module Pie Chart */}
+      {(() => {
+        // Dummy module data (4 main modules)
+        const moduleData = [
+          { label: 'Configurations', value: 77, color: '#4285f4' },
+          { label: 'Project Management', value: 53, color: '#00bfae' },
+          { label: 'Bench', value: 58, color: '#fbbc05' },
+          { label: 'Defects', value: 64, color: '#ea4335' },
+        ];
+        const total = moduleData.reduce((sum, d) => sum + d.value, 0);
+        let startAngle = 0;
+        const pieSegments = moduleData.map((d, idx) => {
+          const angle = (d.value / total) * 2 * Math.PI;
+          const endAngle = startAngle + angle;
+          const r = 80, cx = 90, cy = 90;
+          const x1 = cx + r * Math.cos(startAngle - Math.PI / 2);
+          const y1 = cy + r * Math.sin(startAngle - Math.PI / 2);
+          const x2 = cx + r * Math.cos(endAngle - Math.PI / 2);
+          const y2 = cy + r * Math.sin(endAngle - Math.PI / 2);
+          const largeArc = angle > Math.PI ? 1 : 0;
+          const path = `M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${largeArc},1 ${x2},${y2} Z`;
+          startAngle = endAngle;
+          return (
+            <Path key={d.label} d={path} fill={d.color} stroke="#fff" strokeWidth={2} />
+          );
+        });
+        return (
+          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#222', marginBottom: 8, textAlign: 'center' }}>Defects by Module</Text>
+            <View style={{ alignItems: 'center', marginBottom: 8 }}>
+              <Svg width={180} height={180}>
+                {pieSegments}
+              </Svg>
+            </View>
+            {/* Legend */}
+            <View style={{ flexDirection: 'column', marginTop: 4, marginLeft: 8 }}>
+              {moduleData.map(d => (
+                <View key={d.label} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+                  <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: d.color, marginRight: 7 }} />
+                  <Text style={{ fontSize: 15, color: '#222', fontWeight: '500' }}>{d.label}: <Text style={{ fontWeight: 'bold' }}>{d.value}</Text> <Text style={{ color: '#64748b', fontSize: 13 }}>({((d.value/total)*100).toFixed(2)}%)</Text></Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        );
+      })()}
+      
     </ScrollView>
   );
 }

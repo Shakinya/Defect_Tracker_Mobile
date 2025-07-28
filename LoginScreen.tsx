@@ -1,7 +1,7 @@
 
 
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, Platform } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, Platform, Animated } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 
 
@@ -11,103 +11,97 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Platform.OS === 'ios' ? '#e0e7ff' : '#dbeafe',
+    backgroundColor: '#1B3C53',
     paddingHorizontal: 16,
   },
-  card: {
-    width: '100%',
-    maxWidth: 400,
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 32,
+  topArtWrap: {
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    marginTop: 5,
+    marginBottom: 4,
   },
-  iconCircle: {
-    backgroundColor: '#e0e7ff',
-    borderRadius: 50,
-    width: 70,
-    height: 70,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-    alignSelf: 'center',
+  artImage: {
+    width: 350,
+    height: 220,
+    marginBottom: -6,
   },
+  // card and iconCircle removed
   pageTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#222',
+    color: '#fff',
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: 7,
+    letterSpacing: 1.1,
   },
   pageSubtitle: {
-    fontSize: 16,
-    color: '#64748b',
+    fontSize: 15,
+    color: '#ebeefa',
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 19,
+    lineHeight: 20,
   },
   label: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#222',
-    marginBottom: 6,
+    fontSize: 12,
+    fontWeight: '400',
+    color: '#ffffff',
+    marginBottom: 4,
     alignSelf: 'flex-start',
+    marginLeft: 37,
   },
   input: {
-    width: '100%',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#f8fafc',
+    width: '77%',
+    borderRadius: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 18,
     fontSize: 16,
-    marginBottom: 16,
-    color: '#222',
+    color: '#232B5D',
+    marginBottom: 8,
+    backgroundColor: '#fff',
+    borderWidth: 0,
   },
   optionsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    width: '100%',
-    marginBottom: 16,
+    width: '77%',
+    marginBottom: 18,
   },
   checkboxRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   checkbox: {
-    marginRight: 6,
+    marginLeft: 6,
+    marginRight: 4,
   },
   rememberMeText: {
-    color: '#222',
-    fontSize: 14,
+    color: '#ffffff',
+    fontSize: 12,
   },
   forgotText: {
-    color: '#2563eb',
+    color: '#ffffff',
     fontWeight: '500',
-    fontSize: 14,
+    fontSize: 12,
+    textDecorationColor: '#ffffff',
+    textDecorationLine: 'underline',
   },
   button: {
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    width: '100%',
+    width: '35%',
+    backgroundColor: '#1B3C53',
+    borderRadius: 16,
+    borderColor: '#ffffff',
+    borderWidth: 2,
+    paddingVertical: 8,
     alignItems: 'center',
     marginTop: 8,
-    marginBottom: 8,
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
     flexDirection: 'row',
     justifyContent: 'center',
-    shadowColor: '#2563eb',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 4,
   },
   buttonContent: {
     flexDirection: 'row',
@@ -117,31 +111,33 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     textAlign: 'center',
-    fontWeight: '700',
-    fontSize: 18,
+    fontWeight: '600',
+    fontSize: 16,
     letterSpacing: 1,
   },
-  demoBox: {
-    backgroundColor: '#f1f5f9',
-    borderRadius: 10,
-    padding: 16,
-    marginTop: 8,
-    width: '100%',
-  },
-  demoTitle: {
-    fontWeight: '600',
-    color: '#222',
-    marginBottom: 4,
-    fontSize: 15,
-  },
-  demoText: {
-    color: '#64748b',
-    fontSize: 14,
-  },
+ 
 });
 
 
 function LoginScreen({ navigation }) {
+  // Animation setup
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.8)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 900,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 5,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [fadeAnim, scaleAnim]);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -157,57 +153,52 @@ function LoginScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.card}>
-        <View style={styles.iconCircle}>
-          <Icon name="lock" size={32} color="#3b82f6" style={{ position: 'absolute', right:18, top: 18 }} />
-        </View>
-        <Text style={styles.pageTitle}>DefectTracker Pro</Text>
-        <Text style={styles.pageSubtitle}>Sign in to your account</Text>
-
-        <Text style={styles.label}>Username</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter your username"
-          value={username}
-          onChangeText={setUsername}
-          autoCapitalize="none"
-          placeholderTextColor="#94a3b8"
+      <View style={styles.topArtWrap}>
+        <Animated.Image
+          source={require('./assets/login.png')}
+          style={[
+            styles.artImage,
+            { opacity: fadeAnim, transform: [{ scale: scaleAnim }] },
+          ]}
+          resizeMode="contain"
         />
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter your password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          placeholderTextColor="#94a3b8"
-        />
-
-        <View style={styles.optionsRow}>
-          <View style={styles.checkboxRow}>
-            <TouchableOpacity onPress={() => setRememberMe(!rememberMe)} style={styles.checkbox}>
-              <Icon name={rememberMe ? "check-square" : "square"} size={20} color="#2563eb" />
-            </TouchableOpacity>
-            <Text style={styles.rememberMeText}>Remember Me</Text>
-          </View>
-          <TouchableOpacity>
-            <Text style={styles.forgotText}>Forgot Password?</Text>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity style={styles.button} onPress={handleLogin}>
-          <View style={styles.buttonContent}>
-            <Icon name="user" size={20} color="#fff" style={{ marginRight: 8 }} />
-            <Text style={styles.buttonText}>Sign In</Text>
-          </View>
-        </TouchableOpacity>
-
-        <View style={styles.demoBox}>
-          <Text style={styles.demoTitle}>Demo Credentials:</Text>
-          <Text style={styles.demoText}>Username: admin</Text>
-          <Text style={styles.demoText}>Password: admin</Text>
-        </View>
       </View>
+      <Text style={styles.pageTitle}>DefectTracker Pro</Text>
+      <Text style={styles.pageSubtitle}>Sign in to your account</Text>
+      <Text style={styles.label}>Username</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Enter your username"
+        value={username}
+        onChangeText={setUsername}
+        autoCapitalize="none"
+        placeholderTextColor="#94a3b8"
+      />
+      <Text style={styles.label}>Password</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Enter your password"
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+        placeholderTextColor="#94a3b8"
+      />
+      <View style={styles.optionsRow}>
+        <View style={styles.checkboxRow}>
+          <TouchableOpacity onPress={() => setRememberMe(!rememberMe)} style={styles.checkbox}>
+            <Icon name={rememberMe ? "check-square" : "square"} size={14} color="#ffffff" />
+          </TouchableOpacity>
+          <Text style={styles.rememberMeText}>Remember Me</Text>
+        </View>
+        <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
+          <Text style={styles.forgotText}>Forgot Password?</Text>
+        </TouchableOpacity>
+      </View>
+      <TouchableOpacity style={styles.button} onPress={handleLogin}>
+        <View style={styles.buttonContent}>
+          <Text style={styles.buttonText}>Sign In</Text>
+        </View>
+      </TouchableOpacity>
     </View>
   );
 }

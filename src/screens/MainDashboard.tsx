@@ -5,22 +5,11 @@ const riskColors = {
   Low: '#0b9c40',
 };
 
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Alert } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { Image } from 'react-native';
-
-const projects = [
-  { id: 1, name: 'Defect Tracker', risk: 'High', defects: { high: 3, medium: 1, low: 0 } },
-  { id: 2, name: 'QA testing', risk: 'High', defects: { high: 2, medium: 2, low: 1 } },
-  { id: 3, name: 'project 1', risk: 'Low', defects: { high: 0, medium: 1, low: 4 } },
-  { id: 4, name: 'Heart', risk: 'Low', defects: { high: 0, medium: 0, low: 5 } },
-  { id: 5, name: 'Dashboard testing', risk: 'High', defects: { high: 4, medium: 0, low: 0 } },
-  { id: 6, name: 'JALI', risk: 'Low', defects: { high: 0, medium: 0, low: 3 } },
-  { id: 7, name: 'Hello world', risk: 'Low', defects: { high: 0, medium: 1, low: 2 } },
-  { id: 8, name: 'dashboard test', risk: 'High', defects: { high: 2, medium: 0, low: 0 } },
-  { id: 9, name: 'test dashboard', risk: 'High', defects: { high: 3, medium: 0, low: 0 } },
-];
+import apiService, { ApiProject, ProjectCardColor } from '../services/api';
 
 const styles = StyleSheet.create({
   container: {
@@ -467,16 +456,102 @@ export default function MainDashboard({ navigation }: MainDashboardProps) {
   const [filter, setFilter] = useState('All');
   const [isNight, setIsNight] = useState(false);
   const [bgAnim, setBgAnim] = useState(new (require('react-native')).Animated.Value(0));
-  const highCount = projects.filter(p => p.risk === 'High').length;
-  const mediumCount = projects.filter(p => p.risk === 'Medium').length;
-  const lowCount = projects.filter(p => p.risk === 'Low').length;
+  const [projects, setProjects] = useState<ApiProject[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [projectColors, setProjectColors] = useState<Record<number, ProjectCardColor>>({});
+
+  // Helper function to parse Tailwind CSS color classes
+  const parseTailwindColor = (tailwindClass: string): string => {
+    if (tailwindClass.includes('yellow')) return '#facc15';
+    if (tailwindClass.includes('red')) return '#ef4444';
+    if (tailwindClass.includes('green')) return '#22c55e';
+    if (tailwindClass.includes('blue')) return '#3b82f6';
+    if (tailwindClass.includes('purple')) return '#8b5cf6';
+    if (tailwindClass.includes('orange')) return '#f97316';
+    return '#facc15'; // Default to yellow
+  };
+
+  // Helper function to get primary risk level from availableRiskLevels
+  const getPrimaryRiskLevel = (availableRiskLevels: string[], fallbackRisk: string): string => {
+    if (availableRiskLevels.length === 0) return fallbackRisk;
+    // Priority: High > Medium > Low
+    if (availableRiskLevels.includes('High')) return 'High';
+    if (availableRiskLevels.includes('Medium')) return 'Medium';
+    if (availableRiskLevels.includes('Low')) return 'Low';
+    return fallbackRisk;
+  };
+
+  const fetchProjects = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await apiService.getProjects();
+      setProjects(data);
+      
+      // Fetch colors for each project
+      const colorsMap: Record<number, ProjectCardColor> = {};
+      for (const project of data) {
+        try {
+          const colorData = await apiService.getProjectCardColor(project.id);
+          colorsMap[project.id] = colorData;
+        } catch (err) {
+          console.error(`Error fetching color for project ${project.id}:`, err);
+          // Use default color if API fails
+          colorsMap[project.id] = {
+            projectId: project.id,
+            projectName: project.name,
+            availableRiskLevels: [project.risk || 'Medium'],
+            projectCardColor: 'bg-gradient-to-r from-yellow-400 to-yellow-500'
+          };
+        }
+      }
+      setProjectColors(colorsMap);
+    } catch (err: any) {
+      console.error('Error fetching projects:', err);
+      if (err.message.includes('403')) {
+        setError('Access denied. Please check API authentication.');
+      } else {
+        setError('Failed to fetch projects');
+      }
+      Alert.alert('Error', 'Failed to fetch projects. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProjects();
+    const interval = setInterval(fetchProjects, 30000); // Poll every 30 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  const highCount = projects.filter(p => {
+    const projectColor = projectColors[p.id];
+    return getPrimaryRiskLevel(projectColor?.availableRiskLevels || [], p.risk || 'Medium') === 'High';
+  }).length;
+  const mediumCount = projects.filter(p => {
+    const projectColor = projectColors[p.id];
+    return getPrimaryRiskLevel(projectColor?.availableRiskLevels || [], p.risk || 'Medium') === 'Medium';
+  }).length;
+  const lowCount = projects.filter(p => {
+    const projectColor = projectColors[p.id];
+    return getPrimaryRiskLevel(projectColor?.availableRiskLevels || [], p.risk || 'Medium') === 'Low';
+  }).length;
 
   // Sort projects by risk order: High, Medium, Low
   const riskOrder: Record<'High' | 'Medium' | 'Low', number> = { High: 0, Medium: 1, Low: 2 };
   const filteredProjects =
     filter === 'All'
-      ? [...projects].sort((a, b) => riskOrder[a.risk as 'High' | 'Medium' | 'Low'] - riskOrder[b.risk as 'High' | 'Medium' | 'Low'])
-      : projects.filter(p => p.risk === filter);
+      ? [...projects].sort((a, b) => {
+          const aRisk = getPrimaryRiskLevel(projectColors[a.id]?.availableRiskLevels || [], a.risk || 'Medium');
+          const bRisk = getPrimaryRiskLevel(projectColors[b.id]?.availableRiskLevels || [], b.risk || 'Medium');
+          return riskOrder[aRisk as 'High' | 'Medium' | 'Low'] - riskOrder[bRisk as 'High' | 'Medium' | 'Low'];
+        })
+      : projects.filter(p => {
+          const projectRisk = getPrimaryRiskLevel(projectColors[p.id]?.availableRiskLevels || [], p.risk || 'Medium');
+          return projectRisk === filter;
+        });
 
   const filterPills = [
     { key: 'All', label: 'All Projects', color: '#1B3C53' },
@@ -578,6 +653,32 @@ export default function MainDashboard({ navigation }: MainDashboardProps) {
     outputRange: ['#fff', '#232a3a'],
   });
 
+  if (loading && projects.length === 0) {
+    return (
+      <Animated.View style={{ flex: 1, backgroundColor: bgColor }}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ fontSize: 16, color: isNight ? '#e0e7ff' : '#222' }}>Loading projects...</Text>
+        </View>
+      </Animated.View>
+    );
+  }
+
+  if (error) {
+    return (
+      <Animated.View style={{ flex: 1, backgroundColor: bgColor }}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ fontSize: 16, color: '#ef4444' }}>{error}</Text>
+          <TouchableOpacity 
+            style={{ marginTop: 16, padding: 12, backgroundColor: '#2563eb', borderRadius: 8 }}
+            onPress={() => fetchProjects()}
+          >
+            <Text style={{ color: '#fff', fontWeight: 'bold' }}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+    );
+  }
+
   return (
     <Animated.View style={{ flex: 1, backgroundColor: bgColor }}>
       {/* Blue gradient header with logo at top left and user image at right */}
@@ -599,11 +700,11 @@ export default function MainDashboard({ navigation }: MainDashboardProps) {
           </TouchableOpacity>
           {/* User image */}
           <TouchableOpacity
-            style={{ width: 46, height: 46, borderRadius: 22, overflow: 'hidden', borderWidth: 2, borderColor: '#fff', backgroundColor: '#e5e7eb', justifyContent: 'center', alignItems: 'center', top:59 , right:27 }}
+            style={{ width: 48, height: 48, borderRadius: 22, overflow: 'hidden', borderWidth: 2, borderColor: '#fff', backgroundColor: '#e5e7eb', justifyContent: 'center', alignItems: 'center', top:58 , right:27 }}
             activeOpacity={0.7}
             onPress={() => navigation.navigate('Profile')}
           >
-            <Image source={require('../assets/user.jpg')} style={{ width: 46, height: 46, borderRadius: 22 }} />
+            <Image source={require('../assets/user.jpg')} style={{ width: 50, height: 50, borderRadius: 22 }} />
           </TouchableOpacity>
         </View>
         {/* Greeting row (below logo, left-aligned) */}
@@ -697,47 +798,63 @@ export default function MainDashboard({ navigation }: MainDashboardProps) {
           </View>
           {/* Projects Grid */}
           <View style={styles.projectsGrid}>
-            {filteredProjects.map(project => {
-              // Gradient colors for High/Low risk
-              let gradientColors;
-              if (project.risk === 'High') {
-                gradientColors = ['#ad0c0c', '#b71c1c'];
-              } else if (project.risk === 'Low') {
-                gradientColors = ['#0b9c40', '#038c35'];
-              } else {
-                gradientColors = ['#d9c10d', '#facc15'];
-              }
-              return (
-                <TouchableOpacity
-                  key={project.id}
-                  style={styles.projectCard}
-                  activeOpacity={0.85}
-                  onPress={() => navigation.navigate('ProjectDashboard', { projectId: project.id })}
-                >
-                  {/* Gradient background */}
-                  <View style={[styles.projectCircle, {
-                    backgroundColor: gradientColors[0],
-                  }]} />
-                  <View style={[styles.projectCircle, {
-                    backgroundColor: gradientColors[1],
-                    opacity: 0.7,
-                    position: 'absolute',
-                    left: 0,
-                    top: 0,
-                  }]} />
-                  <View style={{ alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-                    <Icon name="check-circle" size={20} color="#fff" style={styles.projectIcon} />
-                    <Text style={styles.projectName}>{project.name}</Text>
-                    <View style={styles.riskLabel}>
-                      <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 10 }}>{project.risk} Risk</Text>
+            {filteredProjects.length === 0 ? (
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 40 }}>
+                <Icon name="folder" size={48} color={isNight ? '#64748b' : '#94a3b8'} />
+                <Text style={{ fontSize: 16, color: isNight ? '#e0e7ff' : '#64748b', marginTop: 12, textAlign: 'center' }}>
+                  {projects.length === 0 ? 'No projects available' : 'No projects match the selected filter'}
+                </Text>
+              </View>
+            ) : (
+              filteredProjects.map(project => {
+                // Get color from API or use default
+                const projectColor = projectColors[project.id];
+                const baseColor = parseTailwindColor(projectColor?.projectCardColor || 'bg-gradient-to-r from-yellow-400 to-yellow-500');
+                const riskLevel = getPrimaryRiskLevel(projectColor?.availableRiskLevels || [], project.risk || 'Medium');
+                
+                // Create gradient colors based on API color
+                let gradientColors;
+                if (riskLevel === 'High') {
+                  gradientColors = [baseColor, '#b71c1c'];
+                } else if (riskLevel === 'Low') {
+                  gradientColors = [baseColor, '#038c35'];
+                } else {
+                  gradientColors = [baseColor, '#facc15'];
+                }
+                
+                return (
+                  <TouchableOpacity
+                    key={project.id}
+                    style={styles.projectCard}
+                    activeOpacity={0.85}
+                    onPress={() => navigation.navigate('ProjectDashboard', { projectId: project.id })}
+                  >
+                    {/* Gradient background */}
+                    <View style={[styles.projectCircle, {
+                      backgroundColor: gradientColors[0],
+                    }]} />
+                    <View style={[styles.projectCircle, {
+                      backgroundColor: gradientColors[1],
+                      opacity: 0.7,
+                      position: 'absolute',
+                      left: 0,
+                      top: 0,
+                    }]} />
+                    <View style={{ alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+                      <Icon name="check-circle" size={20} color="#fff" style={styles.projectIcon} />
+                      <Text style={styles.projectName}>{project.name}</Text>
+                      <View style={styles.riskLabel}>
+                        <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 10 }}>{riskLevel} Risk</Text>
+                      </View>
                     </View>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+                  </TouchableOpacity>
+                );
+              })
+            )}
           </View>
         </Animated.View>
       </ScrollView>
     </Animated.View>
   );
 }
+

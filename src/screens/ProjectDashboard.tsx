@@ -5,6 +5,7 @@ import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Svg, Path, Circle, Text as SvgText, Polygon } from 'react-native-svg';
 
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,

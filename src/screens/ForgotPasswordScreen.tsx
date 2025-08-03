@@ -34,7 +34,7 @@ export default function ForgotPasswordScreen({ navigation }) {
     <View style={styles.container}>
       <View style={styles.topArtWrap}>
         <Animated.Image
-          source={require('./assets/forgot.png')}
+          source={require('../assets/forgot.png')}
           style={[
             styles.artImage,
             { opacity: fadeAnim, transform: [{ scale: scaleAnim }] },

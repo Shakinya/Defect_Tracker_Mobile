@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
   filterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 7,
+    marginBottom: 6,
     justifyContent: 'flex-start',
   },
   filterLabel: {
@@ -382,9 +382,9 @@ const styles = StyleSheet.create({
   divider: {
     height: 2,
     backgroundColor: '#e5e7eb',
-    marginVertical: 9,
+    marginVertical: 5,
     borderRadius: 1,
-    marginBottom: 19,
+    marginBottom: 22,
   },
   projectsHeader: {
     fontSize: 17,
@@ -584,7 +584,7 @@ export default function MainDashboard({ navigation }: MainDashboardProps) {
       <Animated.View style={{ height: 180, width: '100%', backgroundColor: headerColor, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, overflow: 'hidden', position: 'absolute', top: 0, left: 0, zIndex: 0 }}>
         {/* Logo at top left */}
         <View style={{ position: 'absolute', top: 18, left: 15, zIndex: 2, flexDirection: 'row', alignItems: 'center' }}>
-          <Image source={require('./assets/logo.png')} style={{ width: 44, height: 44 }} resizeMode="contain" />
+          <Image source={require('../assets/logo.png')} style={{ width: 44, height: 44 }} resizeMode="contain" />
           <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600', top:-4, right:5}}> Defect Tracker </Text>
         </View>
         {/* Top right icons row */}
@@ -603,7 +603,7 @@ export default function MainDashboard({ navigation }: MainDashboardProps) {
             activeOpacity={0.7}
             onPress={() => navigation.navigate('Profile')}
           >
-            <Image source={require('./assets/user.jpg')} style={{ width: 46, height: 46, borderRadius: 22 }} />
+            <Image source={require('../assets/user.jpg')} style={{ width: 46, height: 46, borderRadius: 22 }} />
           </TouchableOpacity>
         </View>
         {/* Greeting row (below logo, left-aligned) */}

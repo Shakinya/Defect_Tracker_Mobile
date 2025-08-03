@@ -26,7 +26,7 @@ export default function LandingScreen({ navigation }) {
     <View style={styles.container}>
       <View style={styles.topArtWrap}>
         <Animated.Image
-          source={require('./assets/image.png')} 
+          source={require('../assets/image.png')} 
           style={[
             styles.artImage,
             {

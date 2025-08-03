@@ -157,7 +157,7 @@ function LoginScreen({ navigation }) {
     <View style={styles.container}>
       <View style={styles.topArtWrap}>
         <Animated.Image
-          source={require('./assets/login.png')}
+          source={require('../assets/login.png')}
           style={[
             styles.artImage,
             { opacity: fadeAnim, transform: [{ scale: scaleAnim }] },

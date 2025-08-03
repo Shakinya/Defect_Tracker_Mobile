@@ -31,7 +31,7 @@ const ProfileScreen = () => {
       {/* Header with logo, project name, notification, toggle */}
       <Animated.View style={[styles.header, { backgroundColor: isNight ? '#181e2b' : '#1B3C53' }]}> 
         <View style={styles.headerLeft}>
-          <Image source={require('./assets/logo.png')} style={styles.logo} resizeMode="contain" />
+          <Image source={require('../assets/logo.png')} style={styles.logo} resizeMode="contain" />
           <Text style={styles.projectName}>Defect Tracker</Text>
         </View>
         <View style={styles.headerRight}>
@@ -44,7 +44,7 @@ const ProfileScreen = () => {
         </View>
       </Animated.View>
       <Animated.View style={[styles.profileCard, { backgroundColor: cardColor }]}> 
-        <Image source={require('./assets/user.jpg')} style={styles.avatar} />
+        <Image source={require('../assets/user.jpg')} style={styles.avatar} />
         <Text style={[styles.name, { color: textColor }]}>John Doe</Text>
         <Text style={styles.email}>john.doe@email.com</Text>
         <View style={styles.infoRow}>

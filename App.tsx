@@ -3,12 +3,12 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import LoginScreen from './LoginScreen';
-import ProfileScreen from './ProfileScreen';
-import MainDashboard from './MainDashboard';
-import ProjectDashboard from './ProjectDashboard';
-import LandingScreen from './LandingScreen';
-import ForgotPasswordScreen from './ForgotPasswordScreen';
+import LoginScreen from './src/screens/LoginScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
+import MainDashboard from './src/screens/MainDashboard';
+import ProjectDashboard from './src/screens/ProjectDashboard';
+import LandingScreen from './src/screens/LandingScreen';
+import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
 
 // Placeholder SignUp screen
 function SignUpScreen() {

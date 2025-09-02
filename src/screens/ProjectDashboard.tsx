@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableWithoutFeedback, FlatList, Image, ScrollView, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableWithoutFeedback, FlatList, Image, ScrollView, TouchableOpacity, Animated, Alert } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Svg, Path, Circle, Text as SvgText, Polygon } from 'react-native-svg';
+import ApiService, { ApiProject } from '../services/api';
 
 
 const styles = StyleSheet.create({
@@ -267,16 +268,11 @@ const defectTypeColors = {
   DUPLICATE: '#6b7280',
 };
 
-const projectList = [
+// This will be replaced by API data
+const defaultProjectList: ApiProject[] = [
   { id: 1, name: 'Defect Tracker', risk: 'High' },
   { id: 2, name: 'QA testing', risk: 'High' },
   { id: 3, name: 'project 1', risk: 'Low' },
-  { id: 4, name: 'Heart', risk: 'Low' },
-  { id: 5, name: 'Dashboard testing', risk: 'High' },
-  { id: 6, name: 'JALI', risk: 'Low' },
-  { id: 7, name: 'Hello world', risk: 'Low' },
-  { id: 8, name: 'dashboard test', risk: 'High' },
-  { id: 9, name: 'test dashboard', risk: 'High' },
 ];
 
 type DefectType = 'REOPEN' | 'NEW' | 'OPEN' | 'FIXED' | 'CLOSED' | 'REJECT' | 'DUPLICATE';
@@ -295,6 +291,7 @@ type DefectItem = { id: string; assigned: string; reporter: string; release: str
 
 type RootStackParamList = {
   ProjectDashboard: { projectId: number };
+  Profile: undefined;
 };
 
 interface ProjectDashboardProps {
@@ -302,8 +299,23 @@ interface ProjectDashboardProps {
   navigation: NativeStackNavigationProp<RootStackParamList, 'ProjectDashboard'>;
 }
 
+
+
 export default function ProjectDashboard({ route, navigation }: ProjectDashboardProps) {
   const [isNight, setIsNight] = useState(false);
+  const [projects, setProjects] = useState(defaultProjectList);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [defectRemarkRatio, setDefectRemarkRatio] = useState<any>(null);
+  const [defectRatioLoading, setDefectRatioLoading] = useState(false);
+  const [defectSeverityIndex, setDefectSeverityIndex] = useState<any>(null);
+  const [defectSeverityLoading, setDefectSeverityLoading] = useState(false);
+  const [defectDensity, setDefectDensity] = useState<any>(null);
+  const [defectDensityLoading, setDefectDensityLoading] = useState(false);
+  const [defectDistributionByType, setDefectDistributionByType] = useState<any>(null);
+  const [defectDistributionLoading, setDefectDistributionLoading] = useState(false);
+  const [defectCountByModule, setDefectCountByModule] = useState<any>(null);
+  const [defectCountByModuleLoading, setDefectCountByModuleLoading] = useState(false);
   const bgAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -313,6 +325,30 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
       useNativeDriver: false,
     }).start();
   }, [isNight]);
+
+  // Fetch projects from API
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        setLoading(true);
+        const fetchedProjects = await ApiService.getProjects();
+        setProjects(fetchedProjects);
+        setError(null);
+      } catch (error) {
+        console.error('Failed to fetch projects:', error);
+        setError('Failed to fetch projects. Using default data.');
+        Alert.alert('Error', 'Failed to fetch projects. Using default data.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProjects();
+  }, []);
+
+
+
+
 
   const bgColor = bgAnim.interpolate({
     inputRange: [0, 1],
@@ -326,9 +362,122 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
     inputRange: [0, 1],
     outputRange: ['#fff', '#232a3a'],
   });
+  const textColor = bgAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#222', '#e2e8f0'],
+  });
+  const secondaryTextColor = bgAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#64748b', '#94a3b8'],
+  });
   const { projectId: initialProjectId } = route.params;
   const [selectedProjectId, setSelectedProjectId] = useState<number>(initialProjectId);
+  const selectedProject = projects.find(p => p.id === selectedProjectId);
   const project: ProjectDefectData = defectData[selectedProjectId] || defectData[1];
+
+  // Fetch defect remark ratio when project changes
+  useEffect(() => {
+    if (selectedProjectId && projects.length > 0) {
+      const fetchDefectRemarkRatio = async () => {
+        try {
+          setDefectRatioLoading(true);
+          const ratio = await ApiService.getDefectRemarkRatio(selectedProjectId);
+          setDefectRemarkRatio(ratio);
+        } catch (error) {
+          console.error('Failed to fetch defect remark ratio:', error);
+          setDefectRemarkRatio(null);
+        } finally {
+          setDefectRatioLoading(false);
+        }
+      };
+
+      fetchDefectRemarkRatio();
+    }
+  }, [selectedProjectId, projects]);
+
+  // Fetch defect severity index when project changes
+  useEffect(() => {
+    if (selectedProjectId && projects.length > 0) {
+      const fetchDefectSeverityIndex = async () => {
+        try {
+          setDefectSeverityLoading(true);
+          const severityIndex = await ApiService.getDefectSeverityIndex(selectedProjectId);
+          setDefectSeverityIndex(severityIndex);
+        } catch (error) {
+          console.error('Failed to fetch defect severity index:', error);
+          setDefectSeverityIndex(null);
+        } finally {
+          setDefectSeverityLoading(false);
+        }
+      };
+
+      fetchDefectSeverityIndex();
+    }
+  }, [selectedProjectId, projects]);
+
+  // Fetch defect density when project changes
+  useEffect(() => {
+    if (selectedProjectId && projects.length > 0) {
+      const fetchDefectDensity = async () => {
+        try {
+          setDefectDensityLoading(true);
+          const density = await ApiService.getDefectDensity(selectedProjectId);
+          setDefectDensity(density);
+        } catch (error) {
+          console.error('Failed to fetch defect density:', error);
+          setDefectDensity(null);
+        } finally {
+          setDefectDensityLoading(false);
+        }
+      };
+
+      fetchDefectDensity();
+    }
+  }, [selectedProjectId, projects]);
+
+  // Fetch defect distribution by type when project changes
+  useEffect(() => {
+    if (selectedProjectId && projects.length > 0) {
+      const fetchDefectDistributionByType = async () => {
+        try {
+          setDefectDistributionLoading(true);
+          console.log('Fetching defect distribution by type for project:', selectedProjectId);
+          const distribution = await ApiService.getDefectDistributionByType(selectedProjectId);
+          console.log('Received defect distribution data:', distribution);
+          setDefectDistributionByType(distribution);
+        } catch (error) {
+          console.error('Failed to fetch defect distribution by type:', error);
+          setDefectDistributionByType(null);
+        } finally {
+          setDefectDistributionLoading(false);
+        }
+      };
+
+      fetchDefectDistributionByType();
+    }
+  }, [selectedProjectId, projects]);
+
+  // Fetch defect count by module when project changes
+  useEffect(() => {
+    if (selectedProjectId && projects.length > 0) {
+      const fetchDefectCountByModule = async () => {
+        try {
+          setDefectCountByModuleLoading(true);
+          console.log('Fetching defect count by module for project:', selectedProjectId);
+          const moduleData = await ApiService.getDefectCountByModule(selectedProjectId);
+          console.log('Received defect count by module data:', moduleData);
+          setDefectCountByModule(moduleData);
+        } catch (error) {
+          console.error('Failed to fetch defect count by module:', error);
+          setDefectCountByModule(null);
+        } finally {
+          setDefectCountByModuleLoading(false);
+        }
+      };
+
+      fetchDefectCountByModule();
+    }
+  }, [selectedProjectId, projects]);
 
   // Modal states for defect charts
   const [highChartVisible, setHighChartVisible] = useState(false);
@@ -486,40 +635,80 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
             <ScrollView style={{ flex: 1, marginTop: 150 }} contentContainerStyle={{ paddingBottom: 32 }}> 
 
       {/* Project Selection Pills */}
-    <View style={{ backgroundColor: '#fff', borderRadius: 24, marginHorizontal: 12, padding: 18, shadowColor: '#2563eb', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.10, shadowRadius: 16, elevation: 8 }}>
+    <Animated.View style={{ backgroundColor: cardColor, borderRadius: 24, marginHorizontal: 12, padding: 18, shadowColor: '#2563eb', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.10, shadowRadius: 16, elevation: 8 }}>
       <View style={styles.projectSelectionWrap}>
-        <Text style={styles.projectSelectionTitle}>Project Selection</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.projectSelectionRow}>
-            {projectList.map(p => (
-              <TouchableOpacity
-                key={p.id}
-                style={[styles.projectPill, selectedProjectId === p.id && styles.projectPillActive]}
-                onPress={() => setSelectedProjectId(p.id)}
-                activeOpacity={0.85}
-              >
-                <Text style={[styles.projectPillText, selectedProjectId === p.id && styles.projectPillTextActive]}>{p.name}</Text>
-              </TouchableOpacity>
-            ))}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <Animated.Text style={[styles.projectSelectionTitle, { color: textColor }]}>Project Selection</Animated.Text>
+                    <TouchableOpacity 
+            onPress={() => {
+              setLoading(true);
+              setError(null);
+              ApiService.getProjects()
+                .then((fetchedProjects) => {
+                  setProjects(fetchedProjects);
+                  setError(null);
+                })
+                .catch((error) => {
+                  console.error('Failed to refresh projects:', error);
+                  setError('Failed to refresh projects');
+                })
+                .finally(() => setLoading(false));
+            }}
+            style={{ padding: 4 }}
+            activeOpacity={0.7}
+          >
+            <Icon name="refresh-cw" size={16} color={isNight ? '#94a3b8' : '#64748b'} />
+          </TouchableOpacity>
+        </View>
+        {loading ? (
+          <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+            <Text style={{ color: '#64748b', fontSize: 14 }}>Loading projects...</Text>
           </View>
-        </ScrollView>
+        ) : error ? (
+          <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+            <Text style={{ color: '#ef4444', fontSize: 14, textAlign: 'center' }}>{error}</Text>
+          </View>
+        ) : projects.length === 0 ? (
+          <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+            <Text style={{ color: '#64748b', fontSize: 14 }}>No projects found</Text>
+          </View>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.projectSelectionRow}>
+                            {projects.map((p: ApiProject) => (
+                 <TouchableOpacity
+                   key={p.id}
+                   style={[styles.projectPill, selectedProjectId === p.id && styles.projectPillActive]}
+                   onPress={() => setSelectedProjectId(p.id)}
+                   activeOpacity={0.85}
+                 >
+                   <Text style={[styles.projectPillText, selectedProjectId === p.id && styles.projectPillTextActive]}>{p.name}</Text>
+                 </TouchableOpacity>
+               ))}
+            </View>
+          </ScrollView>
+        )}
       </View>
 
       {/* Project Name and Status */}
-      <View style={styles.projectNameRow}>
-        <Text style={styles.projectName}>{project.name}</Text>
+      <Animated.View style={[styles.projectNameRow, { backgroundColor: cardColor }]}>
+        <Animated.Text style={[styles.projectName, { color: textColor }]}>
+          {selectedProject?.name || 'Project not found'}
+        </Animated.Text>
         <View style={styles.statusLabelWrap}>
-          <Text style={getStatusLabelStyle(project.risk)}>{project.risk} Risk</Text>
+          <Text style={getStatusLabelStyle(selectedProject?.risk || 'Medium')}>
+            {selectedProject?.risk || 'Medium'} Risk
+          </Text>
         </View>
-      </View>
+      </Animated.View>
 
       {/* Defect Severity Breakdown */}
-      <Text style={styles.sectionTitle}>Defect Severity Breakdown</Text>
+      <Animated.Text style={[styles.sectionTitle, { color: secondaryTextColor }]}>Defect Severity Breakdown</Animated.Text>
       <View style={styles.defectCardsCol}>
         {/* High */}
-        <View style={[styles.defectCard, { borderColor: riskColors.High }]}> 
-          <Text style={[styles.defectCardTitle, { color: riskColors.High }]}>Defects on High</Text>
-          <Text style={styles.defectCardTotal}>Total: {project.defects.high.total}</Text>
+        <Animated.View style={[styles.defectCard, { borderColor: riskColors.High, backgroundColor: cardColor }]}> 
+          <Animated.Text style={[styles.defectCardTitle, { color: riskColors.High }]}>Defects on High</Animated.Text>
+          <Animated.Text style={[styles.defectCardTotal, { color: textColor }]}>Total: {project.defects.high.total}</Animated.Text>
           {/* Defect types in two columns */}
           {(() => {
             const defectTypes = Object.entries(project.defects.high).filter(([k]) => k !== 'total');
@@ -575,11 +764,11 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
               </View>
             </View>
           </Modal>
-        </View>
+        </Animated.View>
         {/* Medium */}
-        <View style={[styles.defectCard, styles.defectCardMedium]}> 
-          <Text style={[styles.defectCardTitle, { color: riskColors.Medium }]}>Defects on Medium</Text>
-          <Text style={styles.defectCardTotal}>Total: {project.defects.medium.total}</Text>
+        <Animated.View style={[styles.defectCard, styles.defectCardMedium, { backgroundColor: cardColor }]}> 
+          <Animated.Text style={[styles.defectCardTitle, { color: riskColors.Medium }]}>Defects on Medium</Animated.Text>
+          <Animated.Text style={[styles.defectCardTotal, { color: textColor }]}>Total: {project.defects.medium.total}</Animated.Text>
           {(() => {
             const defectTypes = Object.entries(project.defects.medium).filter(([k]) => k !== 'total');
             const [col1, col2] = splitIntoColumns(defectTypes);
@@ -634,11 +823,11 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
               </View>
             </View>
           </Modal>
-        </View>
+        </Animated.View>
         {/* Low */}
-        <View style={[styles.defectCard, styles.defectCardLow]}> 
-          <Text style={[styles.defectCardTitle, { color: riskColors.Low }]}>Defects on Low</Text>
-          <Text style={styles.defectCardTotal}>Total: {project.defects.low.total}</Text>
+        <Animated.View style={[styles.defectCard, styles.defectCardLow, { backgroundColor: cardColor }]}> 
+          <Animated.Text style={[styles.defectCardTitle, { color: riskColors.Low }]}>Defects on Low</Animated.Text>
+          <Animated.Text style={[styles.defectCardTotal, { color: textColor }]}>Total: {project.defects.low.total}</Animated.Text>
           {(() => {
             const defectTypes = Object.entries(project.defects.low).filter(([k]) => k !== 'total');
             const [col1, col2] = splitIntoColumns(defectTypes);
@@ -693,21 +882,42 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
               </View>
             </View>
           </Modal>
-        </View>
+        </Animated.View>
       </View>   
 
       {/* Defect Density, Severity Index, Defect to Remark Ratio */}
       <View style={{ flexDirection: 'column', gap: 14, marginBottom: 18 }}>
         {/* Defect Density Card */}
-        <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
-          <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#222', marginBottom: 8 }}>Defect Density</Text>
-          {(() => {
-            // Dynamic meter logic
-            const kloc = 100; // Example value, replace with real
-            const defectCount = 449; // Example value, replace with real
-            const defectDensity = defectCount / kloc;
+        <Animated.View style={{ backgroundColor: cardColor, borderRadius: 16, padding: 16, marginBottom: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <Animated.Text style={{ fontSize: 16, fontWeight: 'bold', color: textColor }}>Defect Density</Animated.Text>
+            <TouchableOpacity 
+              onPress={() => {
+                if (selectedProjectId) {
+                  setDefectDensityLoading(true);
+                  ApiService.getDefectDensity(selectedProjectId)
+                    .then(setDefectDensity)
+                    .catch(console.error)
+                    .finally(() => setDefectDensityLoading(false));
+                }
+              }}
+              style={{ padding: 4 }}
+              activeOpacity={0.7}
+            >
+              <Icon name="refresh-cw" size={16} color={isNight ? '#94a3b8' : '#64748b'} />
+            </TouchableOpacity>
+          </View>
+          {defectDensityLoading ? (
+            <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+              <Text style={{ color: '#64748b', fontSize: 14 }}>Loading density meter...</Text>
+            </View>
+          ) : defectDensity ? (() => {
+            // Dynamic meter logic using real API data
+            const kloc = defectDensity.kloc || 100;
+            const defectCount = defectDensity.defectCount || 0;
+            const defectDensityValue = defectDensity.density || (defectCount / kloc);
             const min = 0, max = 15;
-            const cappedDensity = Math.max(min, Math.min(defectDensity, max));
+            const cappedDensity = Math.max(min, Math.min(defectDensityValue, max));
             const angle = -90 + (cappedDensity / 15) * 180;
             // Arc helpers
             function polarToCartesian(cx: number, cy: number, r: number, angle: number) {
@@ -758,9 +968,10 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
             const zoneColor = getZoneColor(cappedDensity);
             return (
               <>
-                <Text style={{ fontSize: 15, color: '#222', textAlign: 'center', marginBottom: 2 }}>
-                  Defect Density: <Text style={{ color: zoneColor, fontWeight: 'bold', fontSize: 18 }}>{isNaN(defectDensity) ? '0.00' : defectDensity.toFixed(2)}</Text>
-                </Text>
+                <Animated.Text style={{ fontSize: 15, color: textColor, textAlign: 'center', marginBottom: 2 }}>
+                  Defect Density: <Text style={{ color: zoneColor, fontWeight: 'bold', fontSize: 18 }}>{isNaN(defectDensityValue) ? '0.00' : defectDensityValue.toFixed(2)}</Text>
+                </Animated.Text>
+
                 <View style={{ alignItems: 'center', marginTop: 8 }}>
                   <Svg width={200} height={120}>
                     {/* Meter background */}
@@ -797,34 +1008,153 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
                     })}
                   </Svg>
                 </View>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 28, marginTop: 6 }}>
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#64748b' }}>{defectCount}</Text>
+                    <Text style={{ fontSize: 12, color: '#222' }}>Defects</Text>
+                  </View>
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#64748b' }}>{kloc}</Text>
+                    <Text style={{ fontSize: 12, color: '#222' }}>KLOC</Text>
+                  </View>
+                </View>
               </>
             );
-          })()}
-        </View>
+          })() : (
+            <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+              <Text style={{ color: '#64748b', fontSize: 14 }}>No data available</Text>
+            </View>
+          )}
+        </Animated.View>
         {/* Defect Severity Index Card */}
-        <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
-          <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#222', marginBottom: 8 }}>Defect Severity Index</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
-            <View style={{ width: 18, height: 80, backgroundColor: '#fef9c3', borderRadius: 9, marginRight: 12, justifyContent: 'flex-end', alignItems: 'center' }}>
-              <View style={{ width: 18, height: 32, backgroundColor: '#eab308', borderRadius: 9 }} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#eab308', marginBottom: 2 }}>43.9</Text>
-              <Text style={{ fontSize: 13, color: '#64748b' }}>Weighted severity score (higher = more severe defects)</Text>
-            </View>
+        <Animated.View style={{ backgroundColor: cardColor, borderRadius: 16, padding: 16, marginBottom: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <Animated.Text style={{ fontSize: 16, fontWeight: 'bold', color: textColor }}>Defect Severity Index</Animated.Text>
+            <TouchableOpacity 
+              onPress={() => {
+                if (selectedProjectId) {
+                  setDefectSeverityLoading(true);
+                  ApiService.getDefectSeverityIndex(selectedProjectId)
+                    .then(setDefectSeverityIndex)
+                    .catch(console.error)
+                    .finally(() => setDefectSeverityLoading(false));
+                }
+              }}
+              style={{ padding: 4 }}
+              activeOpacity={0.7}
+            >
+              <Icon name="refresh-cw" size={16} color={isNight ? '#94a3b8' : '#64748b'} />
+            </TouchableOpacity>
           </View>
-        </View>
+          {defectSeverityLoading ? (
+            <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+              <Text style={{ color: '#64748b', fontSize: 14 }}>Loading severity index...</Text>
+            </View>
+          ) : defectSeverityIndex ? (
+            (() => {
+              const pct = Math.max(0, Math.min(100, Number(defectSeverityIndex.dsiPercentage) || 0));
+              const barColor = pct >= 70 ? '#ef4444' : pct >= 35 ? '#eab308' : '#22c55e';
+              const textColorForBar = barColor;
+              return (
+                <View style={{ marginBottom: 2 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 28, fontWeight: 'bold', color: textColorForBar }}>
+                      {pct.toFixed(1)}
+                    </Text>
+                    <View style={{ backgroundColor: barColor, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 4 }}>
+                      <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 12 }}>
+                        {defectSeverityIndex.interpretation}
+                      </Text>
+                    </View>
+                  </View>
+                  <Animated.Text style={{ fontSize: 13, color: secondaryTextColor, marginTop: 2 }}>
+                    Weighted severity score (higher = more severe defects)
+                  </Animated.Text>
+                  <View style={{ height: 12, backgroundColor: isNight ? '#0f172a' : '#e5e7eb', borderRadius: 6, overflow: 'hidden', marginTop: 10 }}>
+                    <View style={{ width: `${pct}%`, height: '100%', backgroundColor: barColor }} />
+                  </View>
+                </View>
+              );
+            })()
+          ) : (
+            <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+              <Text style={{ color: '#64748b', fontSize: 14 }}>No data available</Text>
+            </View>
+          )}
+        </Animated.View>
         {/* Defect to Remark Ratio Card */}
-        <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
-          <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#222', marginBottom: 8 }}>Defect to Remark Ratio</Text>
-          <View style={{ backgroundColor: '#fef9c3', borderRadius: 16, padding: 18, alignItems: 'center', marginBottom: 6 }}>
-            <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#222', marginBottom: 2 }}>97.79%</Text>
-            <Text style={{ fontSize: 13, color: '#222', marginBottom: 6 }}>Defect to Remark Ratio (%)</Text>
-            <View style={{ backgroundColor: '#eab308', borderRadius: 12, paddingHorizontal: 18, paddingVertical: 4 }}>
-              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>Medium</Text>
-            </View>
+        <Animated.View style={{ 
+          backgroundColor: cardColor, 
+          borderRadius: 16, 
+          padding: 16, 
+          marginBottom: 6, 
+          shadowColor: '#000', 
+          shadowOffset: { width: 0, height: 2 }, 
+          shadowOpacity: 0.06, 
+          shadowRadius: 6, 
+          elevation: 2 
+        }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <Animated.Text style={{ fontSize: 16, fontWeight: 'bold', color: textColor }}>Defect to Remark Ratio</Animated.Text>
+            <TouchableOpacity 
+              onPress={() => {
+                if (selectedProjectId) {
+                  setDefectRatioLoading(true);
+                  ApiService.getDefectRemarkRatio(selectedProjectId)
+                    .then(setDefectRemarkRatio)
+                    .catch(console.error)
+                    .finally(() => setDefectRatioLoading(false));
+                }
+              }}
+              style={{ padding: 4 }}
+              activeOpacity={0.7}
+            >
+              <Icon name="refresh-cw" size={16} color={isNight ? '#94a3b8' : '#64748b'} />
+            </TouchableOpacity>
           </View>
-        </View>
+          {defectRatioLoading ? (
+            <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+              <Text style={{ color: '#64748b', fontSize: 14 }}>Loading ratio...</Text>
+            </View>
+          ) : defectRemarkRatio ? (
+            <View style={{ 
+              backgroundColor: defectRemarkRatio.category === 'High' ? '#fee2e2' : 
+                             defectRemarkRatio.category === 'Medium' ? '#fef9c3' : 
+                             defectRemarkRatio.category === 'Low' ? '#dcfce7' : '#fef9c3', 
+              borderRadius: 16, 
+              padding: 18, 
+              alignItems: 'center', 
+              marginBottom: 6 
+            }}>
+              <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#222', marginBottom: 2 }}>{defectRemarkRatio.ratio}</Text>
+              <Animated.Text style={{ fontSize: 13, color: textColor, marginBottom: 6 }}>Defect to Remark Ratio (%)</Animated.Text>
+              <View style={{ flexDirection: 'row', gap: 20, marginBottom: 8 }}>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#222' }}>{defectRemarkRatio.defects}</Text>
+                  <Text style={{ fontSize: 12, color: '#64748b' }}>Defects</Text>
+                </View>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#222' }}>{defectRemarkRatio.remarks}</Text>
+                  <Text style={{ fontSize: 12, color: '#64748b' }}>Remarks</Text>
+                </View>
+              </View>
+              <View style={{ 
+                backgroundColor: defectRemarkRatio.category === 'High' ? '#ef4444' : 
+                               defectRemarkRatio.category === 'Medium' ? '#eab308' : '#22c55e', 
+                borderRadius: 12, 
+                paddingHorizontal: 18, 
+                paddingVertical: 4 
+              }}>
+                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>{defectRemarkRatio.category}</Text>
+              </View>
+            </View>
+          ) : (
+            <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+              <Text style={{ color: '#64748b', fontSize: 14 }}>No data available</Text>
+            </View>
+          )}
+        </Animated.View>
       </View>
 
       {/* Defects Reopened Multiple Times Pie Chart (Interactive) */}
@@ -848,7 +1178,7 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
           { label: '5 times', value: 1, color: '#ea4335', defects: [
             { id: 'D-109', assigned: 'Walter', reporter: 'Yvonne', release: 'R1.6' },
           ] },
-          { label: '>5 times', value: 1, color: '#9b59b6', defects: [
+          { label: '5+ times', value: 1, color: '#9b59b6', defects: [
             { id: 'D-110', assigned: 'Zara', reporter: 'Quinn', release: 'R1.6' },
           ] },
         ];
@@ -880,8 +1210,8 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
         });
 
         return (
-          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
-            <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#222', marginBottom: 8 }}>Defects Reopened Multiple Times</Text>
+          <Animated.View style={{ backgroundColor: cardColor, borderRadius: 16, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
+            <Animated.Text style={{ fontSize: 16, fontWeight: 'bold', color: textColor, marginBottom: 8 }}>Defects Reopened Multiple Times</Animated.Text>
             <View style={{ alignItems: 'center', marginBottom: 8 }}>
               <Svg width={180} height={180}>
                 {pieSegments}
@@ -892,7 +1222,7 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
               {defectReopenData.map(d => (
                 <View key={d.label} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
                   <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: d.color, marginRight: 7 }} />
-                  <Text style={{ fontSize: 15, color: '#222', fontWeight: '500' }}>{d.label}: <Text style={{ fontWeight: 'bold' }}>{d.value}</Text> <Text style={{ color: '#64748b', fontSize: 13 }}>({((d.value/total)*100).toFixed(1)}%)</Text></Text>
+                  <Animated.Text style={{ fontSize: 15, color: textColor, fontWeight: '500' }}>{d.label}: <Text style={{ fontWeight: 'bold' }}>{d.value}</Text> <Animated.Text style={{ color: secondaryTextColor, fontSize: 13 }}>({((d.value/total)*100).toFixed(1)}%)</Animated.Text></Animated.Text>
                 </View>
               ))}
             </View>
@@ -927,23 +1257,41 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
                 </View>
               </View>
             </Modal>
-          </View>
+          </Animated.View>
         );
       })()}
 
       {/* Defect Distribution by Type Pie Chart */}
       {(() => {
-        // Dummy defect type data
-        const defectTypeData = [
+        // Use API data if available, otherwise fallback to mock data
+        const defectTypeData: Array<{label: string, value: number, color: string}> = defectDistributionByType?.defectTypes?.map((item: any, index: number) => ({
+          label: item.defectType,
+          value: item.defectCount,
+          color: ['#4285f4', '#00bfae', '#fbbc05', '#ea4335', '#ff6b6b', '#4ecdc4'][index % 6] // Color palette
+        })) || [
           { label: 'Functionality', value: 238, color: '#4285f4' },
           { label: 'UI', value: 82, color: '#00bfae' },
           { label: 'Usability', value: 30, color: '#fbbc05' },
           { label: 'Validation', value: 103, color: '#ea4335' },
         ];
-        const total = defectTypeData.reduce((sum, d) => sum + d.value, 0);
+        
+        const total = defectTypeData.reduce((sum: number, d: {label: string, value: number, color: string}) => sum + d.value, 0);
+        
+        // Show loading state
+        if (defectDistributionLoading) {
+          return (
+            <Animated.View style={{ backgroundColor: cardColor, borderRadius: 16, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
+              <Animated.Text style={{ fontSize: 16, fontWeight: 'bold', color: textColor, marginBottom: 8 }}>Defect Distribution by Type</Animated.Text>
+              <View style={{ alignItems: 'center', justifyContent: 'center', height: 180 }}>
+                <Animated.Text style={{ color: secondaryTextColor }}>Loading...</Animated.Text>
+              </View>
+            </Animated.View>
+          );
+        }
+        
         // Pie chart segment generator
         let startAngle = 0;
-        const pieSegments = defectTypeData.map((d, idx) => {
+        const pieSegments = defectTypeData.map((d: {label: string, value: number, color: string}, idx: number) => {
           const angle = (d.value / total) * 2 * Math.PI;
           const endAngle = startAngle + angle;
           // SVG arc math
@@ -959,9 +1307,10 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
             <Path key={d.label} d={path} fill={d.color} stroke="#fff" strokeWidth={2} />
           );
         });
+        
         return (
-          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
-            <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#222', marginBottom: 8 }}>Defect Distribution by Type</Text>
+          <Animated.View style={{ backgroundColor: cardColor, borderRadius: 16, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
+            <Animated.Text style={{ fontSize: 16, fontWeight: 'bold', color: textColor, marginBottom: 8 }}>Defect Distribution by Type</Animated.Text>
             <View style={{ alignItems: 'center', marginBottom: 8 }}>
               <Svg width={180} height={180}>
                 {pieSegments}
@@ -969,20 +1318,33 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
             </View>
             {/* Legend */}
             <View style={{ flexDirection: 'column', marginTop: 4, marginLeft: 8 }}>
-              {defectTypeData.map(d => (
+              {defectTypeData.map((d: {label: string, value: number, color: string}) => (
                 <View key={d.label} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
                   <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: d.color, marginRight: 7 }} />
-                  <Text style={{ fontSize: 15, color: '#222', fontWeight: '500' }}>{d.label}: <Text style={{ fontWeight: 'bold' }}>{d.value}</Text> <Text style={{ color: '#64748b', fontSize: 13 }}>({((d.value/total)*100).toFixed(1)}%)</Text></Text>
+                  <Animated.Text style={{ fontSize: 15, color: textColor, fontWeight: '500' }}>{d.label}: <Text style={{ fontWeight: 'bold' }}>{d.value}</Text> <Animated.Text style={{ color: secondaryTextColor, fontSize: 13 }}>({((d.value/total)*100).toFixed(1)}%)</Animated.Text></Animated.Text>
                 </View>
               ))}
             </View>
-          </View>
+            {/* Show total count and most common type if available */}
+            {defectDistributionByType && (
+              <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#e5e7eb' }}>
+                <Animated.Text style={{ fontSize: 12, color: secondaryTextColor }}>
+                  Total: {defectDistributionByType.totalDefectCount} defects | 
+                  Most Common: {defectDistributionByType.mostCommonDefectType} ({defectDistributionByType.mostCommonDefectCount})
+                </Animated.Text>
+                {/* Debug info - remove this in production */}
+                <Animated.Text style={{ fontSize: 10, color: '#888', marginTop: 4 }}>
+                  API Data: {JSON.stringify(defectDistributionByType.defectTypes?.length || 0)} types loaded
+                </Animated.Text>
+              </View>
+            )}
+          </Animated.View>
         );
       })()}
 
       {/* Time to Find Defects Line Chart (Single) */}
-      <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 18, marginBottom: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
-        <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#222', marginBottom: 12 }}>Time to Find Defects</Text>
+      <Animated.View style={{ backgroundColor: cardColor, borderRadius: 16, padding: 18, marginBottom: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
+        <Animated.Text style={{ fontSize: 18, fontWeight: 'bold', color: textColor, marginBottom: 12 }}>Time to Find Defects</Animated.Text>
         <View style={{ alignItems: 'center' }}>
           <Svg width={320} height={213}>
             {/* Axes */}
@@ -1024,10 +1386,10 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
             <SvgText x={152} y={211} fontSize={10} fill="#64748b" textAnchor="middle">Time (Day)</SvgText>
           </Svg>
         </View>
-      </View>
+      </Animated.View>
       {/* Time to Fix Defects Line Chart (Single) */}
-      <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 18, marginBottom: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
-        <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#222', marginBottom: 12 }}>Time to Fix Defects</Text>
+      <Animated.View style={{ backgroundColor: cardColor, borderRadius: 16, padding: 18, marginBottom: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
+        <Animated.Text style={{ fontSize: 18, fontWeight: 'bold', color: textColor, marginBottom: 12 }}>Time to Fix Defects</Animated.Text>
         <View style={{ alignItems: 'center' }}>
           <Svg width={320} height={215}>
             {/* Axes */}
@@ -1069,20 +1431,38 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
             <SvgText x={122} y={211} fontSize={10} fill="#64748b">Time (Day)</SvgText>
           </Svg>
         </View>
-      </View>
+      </Animated.View>
 
       {/* Defects by Module Pie Chart */}
       {(() => {
-        // Dummy module data (4 main modules)
-        const moduleData = [
+        // Use API data if available, otherwise fallback to mock data
+        const moduleData: Array<{label: string, value: number, color: string}> = defectCountByModule?.map((item: any, index: number) => ({
+          label: item.name,
+          value: item.value,
+          color: ['#4285f4', '#00bfae', '#fbbc05', '#ea4335', '#ff6b6b', '#4ecdc4', '#a8e6cf', '#dcedc1'][index % 8] // Extended color palette
+        })) || [
           { label: 'Configurations', value: 77, color: '#4285f4' },
           { label: 'Project Management', value: 53, color: '#00bfae' },
           { label: 'Bench', value: 58, color: '#fbbc05' },
           { label: 'Defects', value: 64, color: '#ea4335' },
         ];
-        const total = moduleData.reduce((sum, d) => sum + d.value, 0);
+        
+        const total = moduleData.reduce((sum: number, d: {label: string, value: number, color: string}) => sum + d.value, 0);
+        
+        // Show loading state
+        if (defectCountByModuleLoading) {
+          return (
+            <Animated.View style={{ backgroundColor: cardColor, borderRadius: 16, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
+              <Animated.Text style={{ fontSize: 18, fontWeight: 'bold', color: textColor, marginBottom: 8, textAlign: 'center' }}>Defects by Module</Animated.Text>
+              <View style={{ alignItems: 'center', justifyContent: 'center', height: 180 }}>
+                <Animated.Text style={{ color: secondaryTextColor }}>Loading...</Animated.Text>
+              </View>
+            </Animated.View>
+          );
+        }
+        
         let startAngle = 0;
-        const pieSegments = moduleData.map((d, idx) => {
+        const pieSegments = moduleData.map((d: {label: string, value: number, color: string}, idx: number) => {
           const angle = (d.value / total) * 2 * Math.PI;
           const endAngle = startAngle + angle;
           const r = 80, cx = 90, cy = 90;
@@ -1097,9 +1477,10 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
             <Path key={d.label} d={path} fill={d.color} stroke="#fff" strokeWidth={2} />
           );
         });
+        
         return (
-          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#222', marginBottom: 8, textAlign: 'center' }}>Defects by Module</Text>
+          <Animated.View style={{ backgroundColor: cardColor, borderRadius: 16, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
+            <Animated.Text style={{ fontSize: 18, fontWeight: 'bold', color: textColor, marginBottom: 8, textAlign: 'center' }}>Defects by Module</Animated.Text>
             <View style={{ alignItems: 'center', marginBottom: 8 }}>
               <Svg width={180} height={180}>
                 {pieSegments}
@@ -1107,17 +1488,29 @@ export default function ProjectDashboard({ route, navigation }: ProjectDashboard
             </View>
             {/* Legend */}
             <View style={{ flexDirection: 'column', marginTop: 4, marginLeft: 8 }}>
-              {moduleData.map(d => (
+              {moduleData.map((d: {label: string, value: number, color: string}) => (
                 <View key={d.label} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
                   <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: d.color, marginRight: 7 }} />
-                  <Text style={{ fontSize: 15, color: '#222', fontWeight: '500' }}>{d.label}: <Text style={{ fontWeight: 'bold' }}>{d.value}</Text> <Text style={{ color: '#64748b', fontSize: 13 }}>({((d.value/total)*100).toFixed(2)}%)</Text></Text>
+                  <Animated.Text style={{ fontSize: 15, color: textColor, fontWeight: '500' }}>{d.label}: <Text style={{ fontWeight: 'bold' }}>{d.value}</Text> <Animated.Text style={{ color: secondaryTextColor, fontSize: 13 }}>({((d.value/total)*100).toFixed(2)}%)</Animated.Text></Animated.Text>
                 </View>
               ))}
             </View>
-          </View>
+            {/* Show total count if API data is available */}
+            {defectCountByModule && (
+              <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#e5e7eb' }}>
+                <Animated.Text style={{ fontSize: 12, color: secondaryTextColor, textAlign: 'center' }}>
+                  Total: {total} defects | {defectCountByModule.length} modules
+                </Animated.Text>
+                {/* Debug info - remove this in production */}
+                <Animated.Text style={{ fontSize: 10, color: '#888', textAlign: 'center', marginTop: 2 }}>
+                  API Data: {defectCountByModule.length} modules loaded
+                </Animated.Text>
+              </View>
+            )}
+          </Animated.View>
         );
       })()}
-      </View>
+      </Animated.View>
     </ScrollView>
     </Animated.View>
   );

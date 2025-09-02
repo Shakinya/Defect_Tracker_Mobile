@@ -9,13 +9,13 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Alert } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { Image } from 'react-native';
-import apiService, { ApiProject, ProjectCardColor } from '../services/api';
+import apiService, { ApiProject, ProjectCardColor, ProjectCardColorAll } from '../services/api';
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
-    paddingHorizontal: 12,
+    paddingHorizontal: 12 ,
     paddingTop: 24,
   },
   summaryBar: {
@@ -488,16 +488,57 @@ export default function MainDashboard({ navigation }: MainDashboardProps) {
       setError(null);
       const data = await apiService.getProjects();
       setProjects(data);
-      
-      // Fetch colors for each project
+
+      // Fetch all project card colors in one call
+      let allColors: ProjectCardColorAll[] = [];
+      try {
+        allColors = await apiService.getAllProjectCardColors();
+      } catch (err) {
+        console.error('Error fetching all project card colors:', err);
+        allColors = [];
+      }
+
+      // Build a lookup by project name (case-insensitive)
+      const colorByName = new Map<string, ProjectCardColorAll>();
+      for (const item of allColors) {
+        colorByName.set(String(item.projectName || '').toLowerCase(), item);
+      }
+
+      // Helpers to map API color/status to our structures
+      const toTailwindFromColorCode = (code: string): string => {
+        const c = String(code || '').toLowerCase();
+        if (c === 'red') return 'bg-gradient-to-r from-red-400 to-red-500';
+        if (c === 'green') return 'bg-gradient-to-r from-green-400 to-green-500';
+        if (c === 'yellow') return 'bg-gradient-to-r from-yellow-400 to-yellow-500';
+        if (c === 'blue') return 'bg-gradient-to-r from-blue-400 to-blue-500';
+        return 'bg-gradient-to-r from-yellow-400 to-yellow-500';
+      };
+      const toRiskFromStatusOrColor = (status: string, colorCode: string): 'High' | 'Medium' | 'Low' => {
+        const s = String(status || '').toLowerCase();
+        if (s.includes('high')) return 'High';
+        if (s.includes('medium')) return 'Medium';
+        if (s.includes('low')) return 'Low';
+        const c = String(colorCode || '').toLowerCase();
+        if (c === 'red') return 'High';
+        if (c === 'yellow') return 'Medium';
+        if (c === 'green') return 'Low';
+        return 'Medium';
+      };
+
+      // Build colors map per project
       const colorsMap: Record<number, ProjectCardColor> = {};
       for (const project of data) {
-        try {
-          const colorData = await apiService.getProjectCardColor(project.id);
-          colorsMap[project.id] = colorData;
-        } catch (err) {
-          console.error(`Error fetching color for project ${project.id}:`, err);
-          // Use default color if API fails
+        const match = colorByName.get(String(project.name || '').toLowerCase());
+        if (match) {
+          const risk = toRiskFromStatusOrColor(match.status, match.colorCode);
+          colorsMap[project.id] = {
+            projectId: project.id,
+            projectName: project.name,
+            availableRiskLevels: [risk],
+            projectCardColor: toTailwindFromColorCode(match.colorCode),
+          };
+        } else {
+          // Fallback if not found
           colorsMap[project.id] = {
             projectId: project.id,
             projectName: project.name,
